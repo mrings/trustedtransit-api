@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using TrustedTransit.Api.Data;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,8 +18,14 @@ builder.Services.AddControllers();
 // Add Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<TrustedTransitDbContext>(options =>
-    options.UseNpgsql(connectionString)
-);
+{
+    var pgOptions = new Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.NpgsqlDbContextOptionsBuilder(options);
+    pgOptions.UseNodaTime();
+    options.UseNpgsql(connectionString, npgsqlOptions =>
+    {
+        npgsqlOptions.RemoteCertificateValidationCallback = (cert, chain, hostPolicyErrors, sslPolicyErrors) => true;
+    });
+});
 
 // Add Authentication
 builder.Services
