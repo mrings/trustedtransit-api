@@ -18,14 +18,8 @@ builder.Services.AddControllers();
 // Add Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<TrustedTransitDbContext>(options =>
-{
-    var pgOptions = new Npgsql.EntityFrameworkCore.PostgreSQL.Infrastructure.NpgsqlDbContextOptionsBuilder(options);
-    pgOptions.UseNodaTime();
-    options.UseNpgsql(connectionString, npgsqlOptions =>
-    {
-        npgsqlOptions.RemoteCertificateValidationCallback = (cert, chain, hostPolicyErrors, sslPolicyErrors) => true;
-    });
-});
+    options.UseNpgsql(connectionString)
+);
 
 // Add Authentication
 builder.Services
