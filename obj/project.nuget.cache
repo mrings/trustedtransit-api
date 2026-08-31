@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "7hB9U3w1WQY=",
+  "dgSpecHash": "7qyVKBtTcfo=",
   "success": true,
-  "projectFilePath": "C:\\TrustedTransit\\TrustedTransit.Api\\TrustedTransit.Api.csproj",
+  "projectFilePath": "C:\\trustedtransit\\TrustedTransit.Api\\TrustedTransit.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\mitch\\.nuget\\packages\\auth0.core\\7.47.0\\auth0.core.7.47.0.nupkg.sha512",
     "C:\\Users\\mitch\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",

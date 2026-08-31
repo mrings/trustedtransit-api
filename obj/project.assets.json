@@ -3299,11 +3299,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\TrustedTransit\\TrustedTransit.Api\\TrustedTransit.Api.csproj",
+      "projectUniqueName": "C:\\trustedtransit\\TrustedTransit.Api\\TrustedTransit.Api.csproj",
       "projectName": "TrustedTransit.Api",
-      "projectPath": "C:\\TrustedTransit\\TrustedTransit.Api\\TrustedTransit.Api.csproj",
+      "projectPath": "C:\\trustedtransit\\TrustedTransit.Api\\TrustedTransit.Api.csproj",
       "packagesPath": "C:\\Users\\mitch\\.nuget\\packages\\",
-      "outputPath": "C:\\TrustedTransit\\TrustedTransit.Api\\obj\\",
+      "outputPath": "C:\\trustedtransit\\TrustedTransit.Api\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\mitch\\AppData\\Roaming\\NuGet\\NuGet.Config"
