@@ -58,4 +58,13 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Auto-migrate database on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<TrustedTransitDbContext>();
+    db.Database.Migrate();
+}
+
+app.Run();
+
 app.Run();
