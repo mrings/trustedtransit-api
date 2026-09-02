@@ -17,6 +17,14 @@ builder.Services.AddControllers();
 
 // Add Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+// Convert postgresql:// URL to Npgsql connection string if needed
+if (connectionString?.StartsWith("postgresql://") == true)
+{
+    var uri = new Uri(connectionString);
+    connectionString = $"Server={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};User Id={uri.UserInfo.Split(':')[0]};Password={uri.UserInfo.Split(':')[1]};SslMode=Require;";
+}
+
 builder.Services.AddDbContext<TrustedTransitDbContext>(options =>
     options.UseNpgsql(connectionString)
 );
