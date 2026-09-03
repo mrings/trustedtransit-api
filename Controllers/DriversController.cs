@@ -70,6 +70,7 @@ namespace TrustedTransit.Api.Controllers
             });
         }
 
+        [AllowAnonymous]
         [HttpPost]
         public async Task<ActionResult<DriverDto>> CreateDriver([FromBody] CreateDriverRequest request)
         {

@@ -63,7 +63,8 @@ namespace TrustedTransit.Api.Controllers
                 SubscriptionStatus = facility.SubscriptionStatus
             });
         }
-
+        
+        [AllowAnonymous]
         [HttpPost]
         public async Task<ActionResult<FacilityDto>> CreateFacility([FromBody] CreateFacilityRequest request)
         {

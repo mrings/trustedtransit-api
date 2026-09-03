@@ -3242,7 +3242,6 @@
       "outputPath": "C:\\TrustedTransit\\TrustedTransit.Api\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\TrustedTransit\\TrustedTransit.Api\\NuGet.Config",
         "C:\\Users\\mitch\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [

@@ -69,7 +69,8 @@ namespace TrustedTransit.Api.Controllers
                 Status = resident.Status
             });
         }
-
+        
+        [AllowAnonymous]
         [HttpPost]
         public async Task<ActionResult<ResidentDto>> CreateResident([FromBody] CreateResidentRequest request)
         {
