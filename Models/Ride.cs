@@ -8,34 +8,34 @@ namespace TrustedTransit.Api.Models
         
         [ForeignKey("Facility")]
         public Guid FacilityId { get; set; }
-        public Facility Facility { get; set; }
-        
+        public Facility? Facility { get; set; }
+
         [ForeignKey("Resident")]
         public Guid ResidentId { get; set; }
-        public Resident Resident { get; set; }
-        
+        public Resident? Resident { get; set; }
+
         [ForeignKey("Driver")]
         public Guid? DriverId { get; set; }
-        public Driver Driver { get; set; }
+        public Driver? Driver { get; set; }
         
         public DateTime ScheduledPickupTime { get; set; }
         public DateTime? ActualPickupTime { get; set; }
         public DateTime? ActualDropoffTime { get; set; }
         
-        public string PickupAddress { get; set; }
+        public string PickupAddress { get; set; } = string.Empty;
         public decimal? PickupLat { get; set; }
         public decimal? PickupLng { get; set; }
-        
-        public string DestinationAddress { get; set; }
+
+        public string DestinationAddress { get; set; } = string.Empty;
         public decimal? DestinationLat { get; set; }
         public decimal? DestinationLng { get; set; }
-        
+
         public string RideType { get; set; } = "one-time";
-        public string AppointmentType { get; set; }
-        
+        public string AppointmentType { get; set; } = string.Empty;
+
         public bool WheelchairRequired { get; set; } = false;
         public bool EscortRequired { get; set; } = false;
-        public string SpecialInstructions { get; set; }
+        public string SpecialInstructions { get; set; } = string.Empty;
         
         public string Status { get; set; } = "scheduled";
         

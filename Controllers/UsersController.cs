@@ -88,8 +88,8 @@ namespace TrustedTransit.Api.Controllers
 
             var user = new User
             {
-                Email = request.Email,
-                Auth0Id = request.Auth0Id,
+                Email = request.Email ?? string.Empty,
+                Auth0Id = request.Auth0Id ?? string.Empty,
                 Role = request.Role ?? "user",
                 Status = "active"
             };
@@ -168,14 +168,14 @@ namespace TrustedTransit.Api.Controllers
 
     public class CreateUserRequest
     {
-        public string Email { get; set; }
-        public string Auth0Id { get; set; }
-        public string Role { get; set; }
+        public string? Email { get; set; }
+        public string? Auth0Id { get; set; }
+        public string? Role { get; set; }
     }
 
     public class UpdateUserRequest
     {
-        public string Role { get; set; }
-        public string Status { get; set; }
+        public string? Role { get; set; }
+        public string? Status { get; set; }
     }
 }

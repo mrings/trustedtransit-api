@@ -86,10 +86,10 @@ namespace TrustedTransit.Api.Controllers
             {
                 FacilityId = request.FacilityId,
                 ResidentId = request.ResidentId,
-                PickupAddress = request.PickupAddress,
-                DestinationAddress = request.DestinationAddress,
+                PickupAddress = request.PickupAddress ?? string.Empty,
+                DestinationAddress = request.DestinationAddress ?? string.Empty,
                 ScheduledPickupTime = request.ScheduledPickupTime,
-                AppointmentType = request.AppointmentType,
+                AppointmentType = request.AppointmentType ?? string.Empty,
                 RideType = request.RideType ?? "one-time",
                 Status = "scheduled",
                 BaseFare = 10.00m,
@@ -117,7 +117,7 @@ namespace TrustedTransit.Api.Controllers
             if (ride == null)
                 return NotFound();
 
-            ride.Status = request.Status;
+            ride.Status = request.Status ?? ride.Status;
             ride.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -160,15 +160,15 @@ namespace TrustedTransit.Api.Controllers
     {
         public Guid FacilityId { get; set; }
         public Guid ResidentId { get; set; }
-        public string PickupAddress { get; set; }
-        public string DestinationAddress { get; set; }
+        public string? PickupAddress { get; set; }
+        public string? DestinationAddress { get; set; }
         public DateTime ScheduledPickupTime { get; set; }
-        public string AppointmentType { get; set; }
-        public string RideType { get; set; }
+        public string? AppointmentType { get; set; }
+        public string? RideType { get; set; }
     }
 
     public class UpdateRideStatusRequest
     {
-        public string Status { get; set; }
+        public string? Status { get; set; }
     }
 }

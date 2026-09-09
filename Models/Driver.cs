@@ -8,13 +8,13 @@ namespace TrustedTransit.Api.Models
         
         [ForeignKey("User")]
         public Guid UserId { get; set; }
-        public User User { get; set; }
-        
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string Phone { get; set; }
-        public string VehicleType { get; set; }
-        public string VehiclePlate { get; set; }
+        public User? User { get; set; }
+
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public string VehicleType { get; set; } = string.Empty;
+        public string VehiclePlate { get; set; } = string.Empty;
         public string BackgroundCheckStatus { get; set; } = "pending";
         public DateTime? BackgroundCheckDate { get; set; }
         public decimal Rating { get; set; } = 0;

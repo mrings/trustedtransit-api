@@ -70,12 +70,12 @@ namespace TrustedTransit.Api.Controllers
         {
             var facility = new Facility
             {
-                Name = request.Name,
-                Address = request.Address,
-                City = request.City,
-                State = request.State,
-                Zip = request.Zip,
-                Phone = request.Phone,
+                Name = request.Name ?? string.Empty,
+                Address = request.Address ?? string.Empty,
+                City = request.City ?? string.Empty,
+                State = request.State ?? string.Empty,
+                Zip = request.Zip ?? string.Empty,
+                Phone = request.Phone ?? string.Empty,
                 SubscriptionTier = "starter",
                 SubscriptionStatus = "trial"
             };
@@ -142,22 +142,22 @@ namespace TrustedTransit.Api.Controllers
 
     public class CreateFacilityRequest
     {
-        public string Name { get; set; }
-        public string Address { get; set; }
-        public string City { get; set; }
-        public string State { get; set; }
-        public string Zip { get; set; }
-        public string Phone { get; set; }
+        public string? Name { get; set; }
+        public string? Address { get; set; }
+        public string? City { get; set; }
+        public string? State { get; set; }
+        public string? Zip { get; set; }
+        public string? Phone { get; set; }
     }
 
     public class UpdateFacilityRequest
     {
-        public string Name { get; set; }
-        public string Address { get; set; }
-        public string City { get; set; }
-        public string State { get; set; }
-        public string Zip { get; set; }
-        public string Phone { get; set; }
-        public string SubscriptionTier { get; set; }
+        public string? Name { get; set; }
+        public string? Address { get; set; }
+        public string? City { get; set; }
+        public string? State { get; set; }
+        public string? Zip { get; set; }
+        public string? Phone { get; set; }
+        public string? SubscriptionTier { get; set; }
     }
 }

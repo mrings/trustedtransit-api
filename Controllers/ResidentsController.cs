@@ -81,9 +81,10 @@ namespace TrustedTransit.Api.Controllers
                 LastName = request.LastName,
                 Phone = request.Phone,
                 DateOfBirth = request.DateOfBirth,
-                MobilityRequirements = request.MobilityRequirements,
-                MedicalInfo = request.MedicalInfo,
-                FamilyEmail = request.FamilyEmail,
+                MobilityRequirements = request.MobilityRequirements ?? string.Empty,
+                MedicalInfo = request.MedicalInfo ?? string.Empty,
+                Notes = request.Notes ?? string.Empty,
+                FamilyEmail = request.FamilyEmail ?? string.Empty,
                 Status = "active"
             };
 
@@ -169,18 +170,19 @@ namespace TrustedTransit.Api.Controllers
         public string LastName { get; set; }
         public string Phone { get; set; }
         public DateTime DateOfBirth { get; set; }
-        public string MobilityRequirements { get; set; }
-        public string MedicalInfo { get; set; }
-        public string FamilyEmail { get; set; }
+        public string? MobilityRequirements { get; set; }
+        public string? MedicalInfo { get; set; }
+        public string? Notes { get; set; }
+        public string? FamilyEmail { get; set; }
     }
 
     public class UpdateResidentRequest
     {
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string Phone { get; set; }
-        public string MobilityRequirements { get; set; }
-        public string MedicalInfo { get; set; }
-        public string FamilyEmail { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Phone { get; set; }
+        public string? MobilityRequirements { get; set; }
+        public string? MedicalInfo { get; set; }
+        public string? FamilyEmail { get; set; }
     }
 }

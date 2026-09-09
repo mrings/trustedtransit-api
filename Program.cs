@@ -12,7 +12,11 @@ var auth0Domain = builder.Configuration["Auth0:Domain"];
 var auth0Audience = builder.Configuration["Auth0:Audience"];
 
 // Add services
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    // Non-nullable reference types are not implicitly [Required]; validate explicitly with [Required].
+    options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+});
 
 
 // Add Database
@@ -72,7 +76,5 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<TrustedTransitDbContext>();
     db.Database.Migrate();
 }
-
-app.Run();
 
 app.Run();

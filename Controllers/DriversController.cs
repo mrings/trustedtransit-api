@@ -76,11 +76,11 @@ namespace TrustedTransit.Api.Controllers
         {
             var driver = new Driver
             {
-                FirstName = request.FirstName,
-                LastName = request.LastName,
-                Phone = request.Phone,
-                VehicleType = request.VehicleType,
-                VehiclePlate = request.VehiclePlate,
+                FirstName = request.FirstName ?? string.Empty,
+                LastName = request.LastName ?? string.Empty,
+                Phone = request.Phone ?? string.Empty,
+                VehicleType = request.VehicleType ?? string.Empty,
+                VehiclePlate = request.VehiclePlate ?? string.Empty,
                 BackgroundCheckStatus = "pending",
                 Rating = 0,
                 Status = "active"
@@ -163,19 +163,19 @@ namespace TrustedTransit.Api.Controllers
 
     public class CreateDriverRequest
     {
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string Phone { get; set; }
-        public string VehicleType { get; set; }
-        public string VehiclePlate { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Phone { get; set; }
+        public string? VehicleType { get; set; }
+        public string? VehiclePlate { get; set; }
     }
 
     public class UpdateDriverRequest
     {
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string Phone { get; set; }
-        public string Status { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Phone { get; set; }
+        public string? Status { get; set; }
     }
 
     public class UpdateLocationRequest
