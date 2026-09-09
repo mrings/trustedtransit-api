@@ -42,6 +42,20 @@ namespace TrustedTransit.Api.Controllers
                 ? User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                 : null;
 
+        // Auth0 access tokens don't carry email by default; a Login-flow Action adds it,
+        // and custom claims must be namespaced. Check the namespaced claim and the plain one.
+        private const string ClaimNamespace = "https://trustedtransit.app/";
+
+        private string GetEmail() =>
+            User.FindFirst(ClaimNamespace + "email")?.Value
+            ?? User.FindFirst(ClaimTypes.Email)?.Value
+            ?? User.FindFirst("email")?.Value
+            ?? "";
+
+        private string? GetEmailVerified() =>
+            User.FindFirst(ClaimNamespace + "email_verified")?.Value
+            ?? User.FindFirst("email_verified")?.Value;
+
         /// <summary>
         /// Resolves the current caller to a <see cref="User"/> row, creating it on first sight
         /// (get-or-create keyed by Auth0 "sub"). New or still-unlinked users are matched to a
@@ -54,7 +68,7 @@ namespace TrustedTransit.Api.Controllers
             if (string.IsNullOrEmpty(auth0Id))
                 return null;
 
-            var email = User.FindFirst(ClaimTypes.Email)?.Value ?? User.FindFirst("email")?.Value ?? "";
+            var email = GetEmail();
             var user = await db.Users.FirstOrDefaultAsync(u => u.Auth0Id == auth0Id);
 
             if (user == null)
@@ -91,7 +105,7 @@ namespace TrustedTransit.Api.Controllers
         {
             // Treat a missing email_verified claim as "not explicitly false" for now; tighten
             // to require "true" once the Auth0 access token is confirmed to carry the claim.
-            if (string.Equals(User.FindFirst("email_verified")?.Value, "false", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(GetEmailVerified(), "false", StringComparison.OrdinalIgnoreCase))
                 return null;
 
             var at = email.LastIndexOf('@');
