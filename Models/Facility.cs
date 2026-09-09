@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations.Schema;
-
 namespace TrustedTransit.Api.Models
 {
     public class Facility
@@ -14,8 +12,12 @@ namespace TrustedTransit.Api.Models
         public string SubscriptionTier { get; set; } = "starter";
         public string SubscriptionStatus { get; set; } = "trial";
         public string StripeCustomerId { get; set; } = string.Empty;
+
+        // Verified email domain of this facility's staff (e.g. "sunriseseniorliving.com"),
+        // lowercased, no "@". Unique across facilities; null = no auto-join by domain.
+        public string? EmailDomain { get; set; }
         
-        [ForeignKey("User")]
+        // Relationship configured in TrustedTransitDbContext.OnModelCreating.
         public Guid? ContactUserId { get; set; }
         public User? User { get; set; }
         

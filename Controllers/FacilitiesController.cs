@@ -33,6 +33,7 @@ namespace TrustedTransit.Api.Controllers
                     City = f.City,
                     State = f.State,
                     Phone = f.Phone,
+                    EmailDomain = f.EmailDomain,
                     SubscriptionTier = f.SubscriptionTier,
                     SubscriptionStatus = f.SubscriptionStatus
                 })
@@ -59,6 +60,7 @@ namespace TrustedTransit.Api.Controllers
                 State = facility.State,
                 Zip = facility.Zip,
                 Phone = facility.Phone,
+                EmailDomain = facility.EmailDomain,
                 SubscriptionTier = facility.SubscriptionTier,
                 SubscriptionStatus = facility.SubscriptionStatus
             });
@@ -76,6 +78,7 @@ namespace TrustedTransit.Api.Controllers
                 State = request.State ?? string.Empty,
                 Zip = request.Zip ?? string.Empty,
                 Phone = request.Phone ?? string.Empty,
+                EmailDomain = NormalizeEmailDomain(request.EmailDomain),
                 SubscriptionTier = "starter",
                 SubscriptionStatus = "trial"
             };
@@ -105,6 +108,8 @@ namespace TrustedTransit.Api.Controllers
             facility.State = request.State ?? facility.State;
             facility.Zip = request.Zip ?? facility.Zip;
             facility.Phone = request.Phone ?? facility.Phone;
+            if (request.EmailDomain != null)
+                facility.EmailDomain = NormalizeEmailDomain(request.EmailDomain);
             facility.SubscriptionTier = request.SubscriptionTier ?? facility.SubscriptionTier;
             facility.UpdatedAt = DateTime.UtcNow;
 
@@ -123,6 +128,7 @@ namespace TrustedTransit.Api.Controllers
         public string City { get; set; }
         public string State { get; set; }
         public string Phone { get; set; }
+        public string? EmailDomain { get; set; }
         public string SubscriptionTier { get; set; }
         public string SubscriptionStatus { get; set; }
     }
@@ -136,6 +142,7 @@ namespace TrustedTransit.Api.Controllers
         public string State { get; set; }
         public string Zip { get; set; }
         public string Phone { get; set; }
+        public string? EmailDomain { get; set; }
         public string SubscriptionTier { get; set; }
         public string SubscriptionStatus { get; set; }
     }
@@ -148,6 +155,7 @@ namespace TrustedTransit.Api.Controllers
         public string? State { get; set; }
         public string? Zip { get; set; }
         public string? Phone { get; set; }
+        public string? EmailDomain { get; set; }
     }
 
     public class UpdateFacilityRequest
@@ -158,6 +166,7 @@ namespace TrustedTransit.Api.Controllers
         public string? State { get; set; }
         public string? Zip { get; set; }
         public string? Phone { get; set; }
+        public string? EmailDomain { get; set; }
         public string? SubscriptionTier { get; set; }
     }
 }

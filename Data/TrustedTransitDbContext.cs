@@ -19,9 +19,31 @@ namespace TrustedTransit.Api.Data
             
             modelBuilder.Entity<Ride>()
                 .HasIndex(r => new { r.FacilityId, r.ScheduledPickupTime });
-            
+
             modelBuilder.Entity<Ride>()
                 .HasIndex(r => new { r.DriverId, r.Status });
+
+            // One facility per email domain (Postgres treats multiple NULLs as distinct,
+            // so facilities without a domain are unaffected).
+            modelBuilder.Entity<Facility>()
+                .HasIndex(f => f.EmailDomain)
+                .IsUnique();
+
+            // Facility and User reference each other (User.FacilityId = the user's facility;
+            // Facility.ContactUserId = that facility's contact). Configure both as many-to-one
+            // with no inverse navigation so EF doesn't collapse them into one 1:1 relationship
+            // (which would force a unique index on ContactUserId).
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.Facility)
+                .WithMany()
+                .HasForeignKey(u => u.FacilityId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+
+            modelBuilder.Entity<Facility>()
+                .HasOne(f => f.User)
+                .WithMany()
+                .HasForeignKey(f => f.ContactUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
         }
     }
 }

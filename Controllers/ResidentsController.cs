@@ -24,10 +24,14 @@ namespace TrustedTransit.Api.Controllers
         {
             _logger.LogInformation("GetResidents called");
 
+            // Scope to the caller's facility when authenticated; fall back to the query param
+            // for now (frontend has no login yet).
+            var scopedFacilityId = await ResolveFacilityIdAsync(_context, facilityId);
+
             var query = _context.Residents.AsQueryable();
 
-            if (facilityId.HasValue)
-                query = query.Where(r => r.FacilityId == facilityId);
+            if (scopedFacilityId.HasValue && scopedFacilityId != Guid.Empty)
+                query = query.Where(r => r.FacilityId == scopedFacilityId);
 
             var residents = await query
                 .Select(r => new ResidentDto
@@ -74,9 +78,15 @@ namespace TrustedTransit.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<ResidentDto>> CreateResident([FromBody] CreateResidentRequest request)
         {
+            // Use the caller's facility when authenticated; fall back to the request body
+            // until the frontend has login. request.FacilityId is ignored for authenticated users.
+            var facilityId = await ResolveFacilityIdAsync(_context, request.FacilityId);
+            if (facilityId == null || facilityId == Guid.Empty)
+                return BadRequest("Your account isn't linked to a facility yet.");
+
             var resident = new Resident
             {
-                FacilityId = request.FacilityId,
+                FacilityId = facilityId.Value,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
                 Phone = request.Phone,
