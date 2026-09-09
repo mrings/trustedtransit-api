@@ -95,6 +95,25 @@ namespace TrustedTransit.Api.Controllers
                 if (facilityId != null)
                     await AssignFacilityAsync(db, user, facilityId.Value);
             }
+            else if (user.Role != Roles.Admin)
+            {
+                // Invariant: a populated facility always has an admin. If it lost/never had one,
+                // its earliest member is promoted. (Also heals users linked before roles existed.)
+                var hasAdmin = await db.Users.AnyAsync(u => u.FacilityId == user.FacilityId && u.Role == Roles.Admin);
+                if (!hasAdmin)
+                {
+                    var earliestMemberId = await db.Users
+                        .Where(u => u.FacilityId == user.FacilityId)
+                        .OrderBy(u => u.CreatedAt).ThenBy(u => u.Id)
+                        .Select(u => u.Id)
+                        .FirstOrDefaultAsync();
+                    if (earliestMemberId == user.Id)
+                    {
+                        user.Role = Roles.Admin;
+                        user.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+            }
 
             await db.SaveChangesAsync();
             return _currentUser = user;
