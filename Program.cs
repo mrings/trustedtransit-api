@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
@@ -64,18 +65,28 @@ var app = builder.Build();
 
 // Middleware
 
-// Return a real JSON 500 (with CORS headers) instead of a bare connection drop,
-// so client-side errors aren't masked as opaque CORS failures.
+// Return a real JSON error (with CORS headers) instead of a bare connection drop,
+// so client-side errors aren't masked as opaque CORS failures. Logs the full
+// exception to stdout (visible in Railway logs).
 app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
 {
-    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    var ex = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "Unhandled exception processing {Method} {Path}", context.Request.Method, context.Request.Path);
+
+    // A DB constraint failure (bad FK, duplicate) is a client-data problem, not a server bug.
+    var isDbConstraint = ex is DbUpdateException && ex.InnerException is PostgresException pg
+        && (pg.SqlState == PostgresErrorCodes.ForeignKeyViolation || pg.SqlState == PostgresErrorCodes.UniqueViolation);
+
+    context.Response.StatusCode = isDbConstraint ? StatusCodes.Status400BadRequest : StatusCodes.Status500InternalServerError;
     context.Response.ContentType = "application/problem+json";
     context.Response.Headers.AccessControlAllowOrigin = "*";
     await context.Response.WriteAsJsonAsync(new
     {
         type = "https://tools.ietf.org/html/rfc9110#section-15.6.1",
-        title = "An unexpected error occurred.",
-        status = 500
+        title = isDbConstraint ? "A referenced record was not found or already exists." : "An unexpected error occurred.",
+        status = context.Response.StatusCode,
+        detail = ex?.GetBaseException().Message
     });
 }));
 
