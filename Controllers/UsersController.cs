@@ -59,19 +59,21 @@ namespace TrustedTransit.Api.Controllers
         [HttpGet("me")]
         public async Task<ActionResult<UserDetailDto>> GetCurrentUser()
         {
-            var userId = GetUserId();
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == Guid.Parse(userId));
-
+            // Resolves by Auth0 "sub" (not a Guid), creating the row on first sight and
+            // matching a facility by email domain.
+            var user = await GetOrCreateCurrentUserAsync(_context);
             if (user == null)
-                return NotFound();
+                return Unauthorized();
 
             return Ok(new UserDetailDto
             {
                 Id = user.Id,
                 Email = user.Email,
+                Auth0Id = user.Auth0Id,
                 Role = user.Role,
-                Status = user.Status
+                Status = user.Status,
+                FacilityId = user.FacilityId,
+                CreatedAt = user.CreatedAt
             });
         }
 
@@ -163,6 +165,7 @@ namespace TrustedTransit.Api.Controllers
         public string Auth0Id { get; set; }
         public string Role { get; set; }
         public string Status { get; set; }
+        public Guid? FacilityId { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 
