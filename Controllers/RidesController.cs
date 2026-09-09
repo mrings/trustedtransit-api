@@ -88,7 +88,7 @@ namespace TrustedTransit.Api.Controllers
                 ResidentId = request.ResidentId,
                 PickupAddress = request.PickupAddress ?? string.Empty,
                 DestinationAddress = request.DestinationAddress ?? string.Empty,
-                ScheduledPickupTime = request.ScheduledPickupTime,
+                ScheduledPickupTime = ToUtc(request.ScheduledPickupTime),
                 AppointmentType = request.AppointmentType ?? string.Empty,
                 RideType = request.RideType ?? "one-time",
                 Status = "scheduled",

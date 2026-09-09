@@ -80,7 +80,7 @@ namespace TrustedTransit.Api.Controllers
                 FirstName = request.FirstName,
                 LastName = request.LastName,
                 Phone = request.Phone,
-                DateOfBirth = request.DateOfBirth,
+                DateOfBirth = ToUtc(request.DateOfBirth),
                 MobilityRequirements = request.MobilityRequirements ?? string.Empty,
                 MedicalInfo = request.MedicalInfo ?? string.Empty,
                 Notes = request.Notes ?? string.Empty,

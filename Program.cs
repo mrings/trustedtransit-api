@@ -63,6 +63,22 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Middleware
+
+// Return a real JSON 500 (with CORS headers) instead of a bare connection drop,
+// so client-side errors aren't masked as opaque CORS failures.
+app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
+{
+    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    context.Response.ContentType = "application/problem+json";
+    context.Response.Headers.AccessControlAllowOrigin = "*";
+    await context.Response.WriteAsJsonAsync(new
+    {
+        type = "https://tools.ietf.org/html/rfc9110#section-15.6.1",
+        title = "An unexpected error occurred.",
+        status = 500
+    });
+}));
+
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.UseAuthentication();
