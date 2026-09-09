@@ -19,11 +19,17 @@ namespace TrustedTransit.Api.Controllers
             _logger = logger;
         }
 
-        [AllowAnonymous]
+        // Staff of the caller's facility. Empty when the caller isn't linked to one.
         [HttpGet]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetUsers()
         {
+            var me = await CurrentUserAsync(_context);
+            if (me?.FacilityId == null)
+                return Ok(Array.Empty<UserDto>());
+
             var users = await _context.Users
+                .Where(u => u.FacilityId == me.FacilityId)
+                .OrderBy(u => u.Email)
                 .Select(u => new UserDto
                 {
                     Id = u.Id,
@@ -39,11 +45,15 @@ namespace TrustedTransit.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<UserDetailDto>> GetUser(Guid id)
         {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == id);
-
+            var me = await CurrentUserAsync(_context);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
             if (user == null)
                 return NotFound();
+
+            // Only yourself, or an admin of the same facility.
+            var sameFacilityAdmin = me?.Role == Roles.Admin && me.FacilityId != null && me.FacilityId == user.FacilityId;
+            if (me?.Id != user.Id && !sameFacilityAdmin)
+                return Forbid();
 
             return Ok(new UserDetailDto
             {
@@ -52,6 +62,7 @@ namespace TrustedTransit.Api.Controllers
                 Auth0Id = user.Auth0Id,
                 Role = user.Role,
                 Status = user.Status,
+                FacilityId = user.FacilityId,
                 CreatedAt = user.CreatedAt
             });
         }
@@ -98,82 +109,76 @@ namespace TrustedTransit.Api.Controllers
             if (await _context.Users.AnyAsync(u => u.FacilityId == request.FacilityId))
                 return BadRequest("That facility already has members. Ask an admin to add you, or sign in with your work email.");
 
-            user.FacilityId = request.FacilityId;
-            user.UpdatedAt = DateTime.UtcNow;
+            await AssignFacilityAsync(_context, user, request.FacilityId);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("User {UserId} linked to facility {FacilityId}", user.Id, request.FacilityId);
+            _logger.LogInformation("User {UserId} linked to facility {FacilityId} as {Role}", user.Id, request.FacilityId, user.Role);
             return NoContent();
         }
 
-        [AllowAnonymous]
-        [HttpPost]
-        public async Task<ActionResult<UserDto>> CreateUser([FromBody] CreateUserRequest request)
-        {
-            // Check if user already exists
-            var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == request.Email);
-
-            if (existingUser != null)
-                return BadRequest("User already exists");
-
-            var user = new User
-            {
-                Email = request.Email ?? string.Empty,
-                Auth0Id = request.Auth0Id ?? string.Empty,
-                Role = request.Role ?? "user",
-                Status = "active"
-            };
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("User {UserId} created with email {Email}", user.Id, user.Email);
-
-            return CreatedAtAction(nameof(GetUser), new { id = user.Id }, new UserDto
-            {
-                Id = user.Id,
-                Email = user.Email,
-                Role = user.Role,
-                Status = user.Status
-            });
-        }
-
+        // Admin: change a facility member's role or status.
         [HttpPatch("{id}")]
         public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request)
         {
+            var me = await CurrentUserAsync(_context);
+            if (me == null)
+                return Unauthorized();
+
             var user = await _context.Users.FindAsync(id);
             if (user == null)
                 return NotFound();
 
-            // Only allow admin or self to update
-            if (id.ToString() != GetUserId() && !IsAdmin())
+            var isAdminHere = me.Role == Roles.Admin && me.FacilityId != null && me.FacilityId == user.FacilityId;
+            if (!isAdminHere)
                 return Forbid();
 
-            user.Role = request.Role ?? user.Role;
+            if (request.Role != null)
+            {
+                if (!Roles.IsValid(request.Role))
+                    return BadRequest($"Invalid role. Use: {Roles.Admin}, {Roles.User}, {Roles.Driver}.");
+
+                // Don't let an admin demote the facility's last admin (including themselves).
+                if (user.Role == Roles.Admin && request.Role != Roles.Admin)
+                {
+                    var otherAdmins = await _context.Users
+                        .CountAsync(u => u.FacilityId == user.FacilityId && u.Role == Roles.Admin && u.Id != user.Id);
+                    if (otherAdmins == 0)
+                        return BadRequest("A facility must keep at least one admin.");
+                }
+                user.Role = request.Role;
+            }
+
             user.Status = request.Status ?? user.Status;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("User {UserId} updated", id);
-
+            _logger.LogInformation("User {UserId} updated by admin {AdminId}", id, me.Id);
             return NoContent();
         }
 
+        // Admin: remove a member from the facility (keeps the user row, unlinks it).
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteUser(Guid id)
+        public async Task<IActionResult> RemoveUser(Guid id)
         {
-            // Only admin can delete users
-            if (!IsAdmin())
-                return Forbid();
+            var me = await CurrentUserAsync(_context);
+            if (me == null)
+                return Unauthorized();
 
             var user = await _context.Users.FindAsync(id);
             if (user == null)
                 return NotFound();
 
-            _context.Users.Remove(user);
+            var isAdminHere = me.Role == Roles.Admin && me.FacilityId != null && me.FacilityId == user.FacilityId;
+            if (!isAdminHere)
+                return Forbid();
+            if (user.Id == me.Id)
+                return BadRequest("You can't remove yourself.");
+
+            user.FacilityId = null;
+            user.Role = Roles.User;
+            user.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-            _logger.LogInformation("User {UserId} deleted", id);
+            _logger.LogInformation("User {UserId} removed from facility by admin {AdminId}", id, me.Id);
 
             return NoContent();
         }
@@ -196,13 +201,6 @@ namespace TrustedTransit.Api.Controllers
         public string Status { get; set; }
         public Guid? FacilityId { get; set; }
         public DateTime CreatedAt { get; set; }
-    }
-
-    public class CreateUserRequest
-    {
-        public string? Email { get; set; }
-        public string? Auth0Id { get; set; }
-        public string? Role { get; set; }
     }
 
     public class UpdateUserRequest

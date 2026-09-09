@@ -7,6 +7,16 @@ using TrustedTransit.Api.Models;
 
 namespace TrustedTransit.Api.Controllers
 {
+    /// <summary>Known values for <see cref="Models.User.Role"/>.</summary>
+    public static class Roles
+    {
+        public const string Admin = "admin";   // manages the facility, its staff, drivers, billing
+        public const string User = "user";      // facility staff: residents + rides
+        public const string Driver = "driver";  // driver app (not built yet)
+
+        public static bool IsValid(string? r) => r is Admin or User or Driver;
+    }
+
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
@@ -20,20 +30,13 @@ namespace TrustedTransit.Api.Controllers
             "proton.me", "protonmail.com", "gmx.com", "zoho.com", "yandex.com", "mail.com"
         };
 
+        private User? _currentUser;
+        private bool _currentUserLoaded;
+
         protected string GetUserId()
         {
             return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                 ?? throw new UnauthorizedAccessException("User not found");
-        }
-
-        protected string GetUserRole()
-        {
-            return User.FindFirst(ClaimTypes.Role)?.Value ?? "user";
-        }
-
-        protected bool IsAdmin()
-        {
-            return GetUserRole() == "admin";
         }
 
         /// <summary>The Auth0 subject ("sub") of the caller, or null if unauthenticated.</summary>
@@ -64,16 +67,20 @@ namespace TrustedTransit.Api.Controllers
         /// </summary>
         protected async Task<User?> GetOrCreateCurrentUserAsync(TrustedTransitDbContext db)
         {
+            if (_currentUserLoaded)
+                return _currentUser;
+            _currentUserLoaded = true;
+
             var auth0Id = GetAuth0Id();
             if (string.IsNullOrEmpty(auth0Id))
-                return null;
+                return _currentUser = null;
 
             var email = GetEmail();
             var user = await db.Users.FirstOrDefaultAsync(u => u.Auth0Id == auth0Id);
 
             if (user == null)
             {
-                user = new User { Auth0Id = auth0Id, Email = email, Role = "user", Status = "active" };
+                user = new User { Auth0Id = auth0Id, Email = email, Role = Roles.User, Status = "active" };
                 db.Users.Add(user);
             }
             else if (!string.IsNullOrEmpty(email) && user.Email != email)
@@ -86,14 +93,41 @@ namespace TrustedTransit.Api.Controllers
             {
                 var facilityId = await MatchFacilityByEmailDomainAsync(db, email);
                 if (facilityId != null)
-                {
-                    user.FacilityId = facilityId;
-                    user.UpdatedAt = DateTime.UtcNow;
-                }
+                    await AssignFacilityAsync(db, user, facilityId.Value);
             }
 
             await db.SaveChangesAsync();
-            return user;
+            return _currentUser = user;
+        }
+
+        /// <summary>
+        /// Links a user to a facility. The first member of a facility becomes its
+        /// <see cref="Roles.Admin"/>; everyone after keeps their current role (default
+        /// <see cref="Roles.User"/>).
+        /// </summary>
+        protected async Task AssignFacilityAsync(TrustedTransitDbContext db, User user, Guid facilityId)
+        {
+            user.FacilityId = facilityId;
+            var isFirstMember = !await db.Users.AnyAsync(u => u.FacilityId == facilityId && u.Id != user.Id);
+            if (isFirstMember)
+                user.Role = Roles.Admin;
+            user.UpdatedAt = DateTime.UtcNow;
+        }
+
+        /// <summary>The resolved current user, or null if unauthenticated.</summary>
+        protected Task<User?> CurrentUserAsync(TrustedTransitDbContext db) => GetOrCreateCurrentUserAsync(db);
+
+        /// <summary>True when the caller is an admin of their facility.</summary>
+        protected async Task<bool> IsAdminAsync(TrustedTransitDbContext db) =>
+            (await CurrentUserAsync(db))?.Role == Roles.Admin;
+
+        /// <summary>Null when the caller is an admin (of any facility); otherwise the error result to return.</summary>
+        protected async Task<ActionResult?> CheckAdminAsync(TrustedTransitDbContext db)
+        {
+            var me = await CurrentUserAsync(db);
+            if (me == null) return Unauthorized();
+            if (me.Role != Roles.Admin) return Forbid();
+            return null;
         }
 
         /// <summary>

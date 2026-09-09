@@ -70,10 +70,12 @@ namespace TrustedTransit.Api.Controllers
             });
         }
 
-        [AllowAnonymous]
+        // Admin only. Drivers aren't facility-scoped yet (shared provider pool).
         [HttpPost]
         public async Task<ActionResult<DriverDto>> CreateDriver([FromBody] CreateDriverRequest request)
         {
+            if (await CheckAdminAsync(_context) is { } err) return err;
+
             var driver = new Driver
             {
                 FirstName = request.FirstName ?? string.Empty,
@@ -99,9 +101,12 @@ namespace TrustedTransit.Api.Controllers
             });
         }
 
+        // Admin only.
         [HttpPatch("{id}")]
         public async Task<IActionResult> UpdateDriver(Guid id, [FromBody] UpdateDriverRequest request)
         {
+            if (await CheckAdminAsync(_context) is { } err) return err;
+
             var driver = await _context.Drivers.FindAsync(id);
             if (driver == null)
                 return NotFound();
@@ -118,9 +123,12 @@ namespace TrustedTransit.Api.Controllers
             return NoContent();
         }
 
+        // Admin for now; a driver updating their own location comes with the driver app.
         [HttpPatch("{id}/location")]
         public async Task<IActionResult> UpdateDriverLocation(Guid id, [FromBody] UpdateLocationRequest request)
         {
+            if (await CheckAdminAsync(_context) is { } err) return err;
+
             var driver = await _context.Drivers.FindAsync(id);
             if (driver == null)
                 return NotFound();

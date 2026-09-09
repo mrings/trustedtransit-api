@@ -95,9 +95,16 @@ namespace TrustedTransit.Api.Controllers
             });
         }
 
+        // Admin of this facility only.
         [HttpPatch("{id}")]
         public async Task<IActionResult> UpdateFacility(Guid id, [FromBody] UpdateFacilityRequest request)
         {
+            var me = await CurrentUserAsync(_context);
+            if (me == null)
+                return Unauthorized();
+            if (me.Role != Roles.Admin || me.FacilityId != id)
+                return Forbid();
+
             var facility = await _context.Facilities.FindAsync(id);
             if (facility == null)
                 return NotFound();
