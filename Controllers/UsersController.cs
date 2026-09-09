@@ -77,6 +77,35 @@ namespace TrustedTransit.Api.Controllers
             });
         }
 
+        /// <summary>
+        /// Self-serve link for a user whose email domain doesn't auto-match: attaches the
+        /// caller to a facility that has no members yet. Established facilities require an
+        /// admin (or an email-domain match). One-time — can't be used to switch facilities.
+        /// </summary>
+        [HttpPost("me/facility")]
+        public async Task<IActionResult> LinkMyFacility([FromBody] LinkFacilityRequest request)
+        {
+            var user = await GetOrCreateCurrentUserAsync(_context);
+            if (user == null)
+                return Unauthorized();
+
+            if (user.FacilityId != null)
+                return BadRequest("Your account is already linked to a facility.");
+
+            if (!await _context.Facilities.AnyAsync(f => f.Id == request.FacilityId))
+                return NotFound("Facility not found.");
+
+            if (await _context.Users.AnyAsync(u => u.FacilityId == request.FacilityId))
+                return BadRequest("That facility already has members. Ask an admin to add you, or sign in with your work email.");
+
+            user.FacilityId = request.FacilityId;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("User {UserId} linked to facility {FacilityId}", user.Id, request.FacilityId);
+            return NoContent();
+        }
+
         [AllowAnonymous]
         [HttpPost]
         public async Task<ActionResult<UserDto>> CreateUser([FromBody] CreateUserRequest request)
@@ -180,5 +209,10 @@ namespace TrustedTransit.Api.Controllers
     {
         public string? Role { get; set; }
         public string? Status { get; set; }
+    }
+
+    public class LinkFacilityRequest
+    {
+        public Guid FacilityId { get; set; }
     }
 }
