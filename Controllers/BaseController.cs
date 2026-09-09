@@ -178,16 +178,9 @@ namespace TrustedTransit.Api.Controllers
             return matches.Count == 1 ? matches[0] : null;
         }
 
-        /// <summary>
-        /// The facility a write should be scoped to: the authenticated user's facility when set,
-        /// otherwise <paramref name="requestedFacilityId"/> (the pre-auth fallback the frontend
-        /// still relies on). Null means "couldn't determine one".
-        /// </summary>
-        protected async Task<Guid?> ResolveFacilityIdAsync(TrustedTransitDbContext db, Guid? requestedFacilityId)
-        {
-            var user = await GetOrCreateCurrentUserAsync(db);
-            return user?.FacilityId ?? requestedFacilityId;
-        }
+        /// <summary>The authenticated caller's facility, or null if they aren't linked to one.</summary>
+        protected async Task<Guid?> CurrentFacilityIdAsync(TrustedTransitDbContext db) =>
+            (await GetOrCreateCurrentUserAsync(db))?.FacilityId;
 
         /// <summary>Lowercases and strips a leading "@"/whitespace from an email domain; null/empty -> null.</summary>
         protected static string? NormalizeEmailDomain(string? domain)

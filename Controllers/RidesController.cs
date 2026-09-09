@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrustedTransit.Api.Data;
@@ -19,20 +18,14 @@ namespace TrustedTransit.Api.Controllers
             _logger = logger;
         }
 
-        [AllowAnonymous]
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<RideDto>>> GetRides([FromQuery] Guid? facilityId, [FromQuery] string status = null)
+        public async Task<ActionResult<IEnumerable<RideDto>>> GetRides([FromQuery] string? status = null)
         {
-            _logger.LogInformation("GetRides called");
+            var facilityId = await CurrentFacilityIdAsync(_context);
+            if (facilityId == null)
+                return Ok(Array.Empty<RideDto>());
 
-            // Scope to the caller's facility when authenticated; fall back to the query param
-            // for now (frontend has no login yet).
-            var scopedFacilityId = await ResolveFacilityIdAsync(_context, facilityId);
-
-            var query = _context.Rides.AsQueryable();
-
-            if (scopedFacilityId.HasValue && scopedFacilityId != Guid.Empty)
-                query = query.Where(r => r.FacilityId == scopedFacilityId);
+            var query = _context.Rides.Where(r => r.FacilityId == facilityId);
 
             if (!string.IsNullOrEmpty(status))
                 query = query.Where(r => r.Status == status);
@@ -54,12 +47,12 @@ namespace TrustedTransit.Api.Controllers
             return Ok(rides);
         }
 
-        [AllowAnonymous]
         [HttpGet("{id}")]
         public async Task<ActionResult<RideDetailDto>> GetRide(Guid id)
         {
+            var facilityId = await CurrentFacilityIdAsync(_context);
             var ride = await _context.Rides
-                .FirstOrDefaultAsync(r => r.Id == id);
+                .FirstOrDefaultAsync(r => r.Id == id && r.FacilityId == facilityId);
 
             if (ride == null)
                 return NotFound();
@@ -82,14 +75,11 @@ namespace TrustedTransit.Api.Controllers
             });
         }
 
-        [AllowAnonymous]
         [HttpPost]
         public async Task<ActionResult<RideDto>> CreateRide([FromBody] CreateRideRequest request)
         {
-            // Use the caller's facility when authenticated; fall back to the request body
-            // until the frontend has login. request.FacilityId is ignored for authenticated users.
-            var facilityId = await ResolveFacilityIdAsync(_context, request.FacilityId);
-            if (facilityId == null || facilityId == Guid.Empty)
+            var facilityId = await CurrentFacilityIdAsync(_context);
+            if (facilityId == null)
                 return BadRequest("Your account isn't linked to a facility yet.");
 
             // The resident must belong to that facility.
@@ -125,11 +115,12 @@ namespace TrustedTransit.Api.Controllers
             });
         }
 
-        [AllowAnonymous]
         [HttpPatch("{id}")]
         public async Task<IActionResult> UpdateRideStatus(Guid id, [FromBody] UpdateRideStatusRequest request)
         {
-            var ride = await _context.Rides.FindAsync(id);
+            var facilityId = await CurrentFacilityIdAsync(_context);
+            var ride = await _context.Rides
+                .FirstOrDefaultAsync(r => r.Id == id && r.FacilityId == facilityId);
             if (ride == null)
                 return NotFound();
 
@@ -174,7 +165,6 @@ namespace TrustedTransit.Api.Controllers
 
     public class CreateRideRequest
     {
-        public Guid FacilityId { get; set; }
         public Guid ResidentId { get; set; }
         public string? PickupAddress { get; set; }
         public string? DestinationAddress { get; set; }

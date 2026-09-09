@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrustedTransit.Api.Data;
 using TrustedTransit.Api.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace TrustedTransit.Api.Controllers
 {
@@ -18,22 +17,16 @@ namespace TrustedTransit.Api.Controllers
             _context = context;
             _logger = logger;
         }
-        [AllowAnonymous]
+
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ResidentDto>>> GetResidents([FromQuery] Guid? facilityId)
+        public async Task<ActionResult<IEnumerable<ResidentDto>>> GetResidents()
         {
-            _logger.LogInformation("GetResidents called");
+            var facilityId = await CurrentFacilityIdAsync(_context);
+            if (facilityId == null)
+                return Ok(Array.Empty<ResidentDto>());
 
-            // Scope to the caller's facility when authenticated; fall back to the query param
-            // for now (frontend has no login yet).
-            var scopedFacilityId = await ResolveFacilityIdAsync(_context, facilityId);
-
-            var query = _context.Residents.AsQueryable();
-
-            if (scopedFacilityId.HasValue && scopedFacilityId != Guid.Empty)
-                query = query.Where(r => r.FacilityId == scopedFacilityId);
-
-            var residents = await query
+            var residents = await _context.Residents
+                .Where(r => r.FacilityId == facilityId)
                 .Select(r => new ResidentDto
                 {
                     Id = r.Id,
@@ -52,8 +45,9 @@ namespace TrustedTransit.Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<ResidentDetailDto>> GetResident(Guid id)
         {
+            var facilityId = await CurrentFacilityIdAsync(_context);
             var resident = await _context.Residents
-                .FirstOrDefaultAsync(r => r.Id == id);
+                .FirstOrDefaultAsync(r => r.Id == id && r.FacilityId == facilityId);
 
             if (resident == null)
                 return NotFound();
@@ -74,14 +68,11 @@ namespace TrustedTransit.Api.Controllers
             });
         }
         
-        [AllowAnonymous]
         [HttpPost]
         public async Task<ActionResult<ResidentDto>> CreateResident([FromBody] CreateResidentRequest request)
         {
-            // Use the caller's facility when authenticated; fall back to the request body
-            // until the frontend has login. request.FacilityId is ignored for authenticated users.
-            var facilityId = await ResolveFacilityIdAsync(_context, request.FacilityId);
-            if (facilityId == null || facilityId == Guid.Empty)
+            var facilityId = await CurrentFacilityIdAsync(_context);
+            if (facilityId == null)
                 return BadRequest("Your account isn't linked to a facility yet.");
 
             var resident = new Resident
@@ -114,7 +105,9 @@ namespace TrustedTransit.Api.Controllers
         [HttpPatch("{id}")]
         public async Task<IActionResult> UpdateResident(Guid id, [FromBody] UpdateResidentRequest request)
         {
-            var resident = await _context.Residents.FindAsync(id);
+            var facilityId = await CurrentFacilityIdAsync(_context);
+            var resident = await _context.Residents
+                .FirstOrDefaultAsync(r => r.Id == id && r.FacilityId == facilityId);
             if (resident == null)
                 return NotFound();
 
@@ -135,7 +128,9 @@ namespace TrustedTransit.Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteResident(Guid id)
         {
-            var resident = await _context.Residents.FindAsync(id);
+            var facilityId = await CurrentFacilityIdAsync(_context);
+            var resident = await _context.Residents
+                .FirstOrDefaultAsync(r => r.Id == id && r.FacilityId == facilityId);
             if (resident == null)
                 return NotFound();
 
@@ -175,7 +170,6 @@ namespace TrustedTransit.Api.Controllers
 
     public class CreateResidentRequest
     {
-        public Guid FacilityId { get; set; }
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string Phone { get; set; }

@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrustedTransit.Api.Data;
 using TrustedTransit.Api.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace TrustedTransit.Api.Controllers
 {
@@ -18,13 +17,21 @@ namespace TrustedTransit.Api.Controllers
             _context = context;
             _logger = logger;
         }
-        [AllowAnonymous]
+
+        // Your own facility if you're linked to one; otherwise the facilities with no
+        // members yet (the ones you can claim via POST /users/me/facility).
         [HttpGet]
         public async Task<ActionResult<IEnumerable<FacilityDto>>> GetFacilities()
         {
-            _logger.LogInformation("GetFacilities called");
+            var myFacilityId = await CurrentFacilityIdAsync(_context);
 
-            var facilities = await _context.Facilities
+            IQueryable<Facility> q;
+            if (myFacilityId != null)
+                q = _context.Facilities.Where(f => f.Id == myFacilityId);
+            else
+                q = _context.Facilities.Where(f => !_context.Users.Any(u => u.FacilityId == f.Id));
+
+            var facilities = await q
                 .Select(f => new FacilityDto
                 {
                     Id = f.Id,
@@ -42,12 +49,15 @@ namespace TrustedTransit.Api.Controllers
             return Ok(facilities);
         }
 
+        // Your own facility only.
         [HttpGet("{id}")]
         public async Task<ActionResult<FacilityDetailDto>> GetFacility(Guid id)
         {
-            var facility = await _context.Facilities
-                .FirstOrDefaultAsync(f => f.Id == id);
+            var myFacilityId = await CurrentFacilityIdAsync(_context);
+            if (myFacilityId != id)
+                return Forbid();
 
+            var facility = await _context.Facilities.FirstOrDefaultAsync(f => f.Id == id);
             if (facility == null)
                 return NotFound();
 
@@ -66,10 +76,16 @@ namespace TrustedTransit.Api.Controllers
             });
         }
         
-        [AllowAnonymous]
+        // Sign-up: an authenticated user with no facility creates one and becomes its admin.
         [HttpPost]
         public async Task<ActionResult<FacilityDto>> CreateFacility([FromBody] CreateFacilityRequest request)
         {
+            var me = await CurrentUserAsync(_context);
+            if (me == null)
+                return Unauthorized();
+            if (me.FacilityId != null)
+                return BadRequest("Your account is already linked to a facility.");
+
             var facility = new Facility
             {
                 Name = request.Name ?? string.Empty,
@@ -84,9 +100,10 @@ namespace TrustedTransit.Api.Controllers
             };
 
             _context.Facilities.Add(facility);
+            await AssignFacilityAsync(_context, me, facility.Id);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Facility {FacilityId} created", facility.Id);
+            _logger.LogInformation("Facility {FacilityId} created by {UserId}", facility.Id, me.Id);
 
             return CreatedAtAction(nameof(GetFacility), new { id = facility.Id }, new FacilityDto
             {

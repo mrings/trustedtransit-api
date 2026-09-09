@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrustedTransit.Api.Data;
 using TrustedTransit.Api.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace TrustedTransit.Api.Controllers
 {
@@ -18,9 +17,9 @@ namespace TrustedTransit.Api.Controllers
             _context = context;
             _logger = logger;
         }
-        [AllowAnonymous]
+
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<DriverDto>>> GetDrivers([FromQuery] string status = null)
+        public async Task<ActionResult<IEnumerable<DriverDto>>> GetDrivers([FromQuery] string? status = null)
         {
             _logger.LogInformation("GetDrivers called");
 
