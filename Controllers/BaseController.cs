@@ -59,6 +59,41 @@ namespace TrustedTransit.Api.Controllers
             User.FindFirst(ClaimNamespace + "email_verified")?.Value
             ?? User.FindFirst("email_verified")?.Value;
 
+        private string? _userInfoEmail;
+        private bool? _userInfoVerified;
+        private bool _userInfoFetched;
+
+        /// <summary>
+        /// Calls Auth0's /userinfo with the caller's access token to get their verified email
+        /// when the token itself doesn't carry it (no custom-claim Action configured).
+        /// </summary>
+        private async Task EnsureUserInfoAsync()
+        {
+            if (_userInfoFetched) return;
+            _userInfoFetched = true;
+
+            var bearer = Request.Headers.Authorization.ToString();
+            if (!bearer.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return;
+            var domain = HttpContext.RequestServices.GetService<IConfiguration>()?["Auth0:Domain"];
+            var factory = HttpContext.RequestServices.GetService<IHttpClientFactory>();
+            if (string.IsNullOrEmpty(domain) || factory == null) return;
+
+            try
+            {
+                var client = factory.CreateClient();
+                using var req = new HttpRequestMessage(HttpMethod.Get, $"https://{domain}/userinfo");
+                req.Headers.Add("Authorization", bearer);
+                var res = await client.SendAsync(req);
+                if (!res.IsSuccessStatusCode) return;
+                using var doc = System.Text.Json.JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+                if (doc.RootElement.TryGetProperty("email", out var e) && e.ValueKind == System.Text.Json.JsonValueKind.String)
+                    _userInfoEmail = e.GetString();
+                if (doc.RootElement.TryGetProperty("email_verified", out var v))
+                    _userInfoVerified = v.ValueKind == System.Text.Json.JsonValueKind.True;
+            }
+            catch { /* best effort */ }
+        }
+
         /// <summary>
         /// Resolves the current caller to a <see cref="User"/> row, creating it on first sight
         /// (get-or-create keyed by Auth0 "sub"). New or still-unlinked users are matched to a
@@ -76,6 +111,11 @@ namespace TrustedTransit.Api.Controllers
                 return _currentUser = null;
 
             var email = GetEmail();
+            if (string.IsNullOrEmpty(email))
+            {
+                await EnsureUserInfoAsync();
+                email = _userInfoEmail ?? "";
+            }
             var user = await db.Users.FirstOrDefaultAsync(u => u.Auth0Id == auth0Id);
 
             if (user == null)
@@ -156,9 +196,8 @@ namespace TrustedTransit.Api.Controllers
         /// </summary>
         private async Task<Guid?> MatchFacilityByEmailDomainAsync(TrustedTransitDbContext db, string email)
         {
-            // Treat a missing email_verified claim as "not explicitly false" for now; tighten
-            // to require "true" once the Auth0 access token is confirmed to carry the claim.
-            if (string.Equals(GetEmailVerified(), "false", StringComparison.OrdinalIgnoreCase))
+            // Block only when we positively know the email is unverified.
+            if (string.Equals(GetEmailVerified(), "false", StringComparison.OrdinalIgnoreCase) || _userInfoVerified == false)
                 return null;
 
             var at = email.LastIndexOf('@');

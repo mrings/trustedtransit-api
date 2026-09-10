@@ -42,7 +42,7 @@ namespace TrustedTransit.Api.Controllers
             return Ok(users);
         }
 
-        [HttpGet("{id}")]
+        [HttpGet("{id:guid}")]
         public async Task<ActionResult<UserDetailDto>> GetUser(Guid id)
         {
             var me = await CurrentUserAsync(_context);
@@ -120,8 +120,54 @@ namespace TrustedTransit.Api.Controllers
             return NoContent();
         }
 
+        // Admin: people who have signed in but aren't attached to any facility yet.
+        [HttpGet("unlinked")]
+        public async Task<ActionResult<IEnumerable<UserDto>>> GetUnlinked()
+        {
+            var me = await CurrentUserAsync(_context);
+            if (me?.Role != Roles.Admin || me.FacilityId == null)
+                return Ok(Array.Empty<UserDto>());
+
+            var facility = await _context.Facilities.FirstAsync(f => f.Id == me.FacilityId);
+            var users = await _context.Users
+                .Where(u => u.FacilityId == null && u.Role != Roles.Driver)
+                .OrderBy(u => u.CreatedAt)
+                .Select(u => new UserDto { Id = u.Id, Email = u.Email, Role = u.Role, Status = u.Status })
+                .ToListAsync();
+
+            // If the facility has an email domain, only surface matching addresses.
+            if (!string.IsNullOrEmpty(facility.EmailDomain))
+                users = users
+                    .Where(u => u.Email.EndsWith("@" + facility.EmailDomain, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+            return Ok(users);
+        }
+
+        // Admin: attach an unlinked user to the admin's facility.
+        [HttpPost("{id:guid}/facility")]
+        public async Task<IActionResult> AddToFacility(Guid id)
+        {
+            var me = await CurrentUserAsync(_context);
+            if (me?.Role != Roles.Admin || me.FacilityId == null)
+                return StatusCode(403, "Admins only.");
+
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+                return NotFound();
+            if (user.FacilityId != null)
+                return BadRequest("That user is already in a facility.");
+
+            user.FacilityId = me.FacilityId;
+            user.Role = Roles.User;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Admin {AdminId} added user {UserId} to facility {FacilityId}", me.Id, id, me.FacilityId);
+            return NoContent();
+        }
+
         // Admin: change a facility member's role or status.
-        [HttpPatch("{id}")]
+        [HttpPatch("{id:guid}")]
         public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request)
         {
             var me = await CurrentUserAsync(_context);
@@ -161,7 +207,7 @@ namespace TrustedTransit.Api.Controllers
         }
 
         // Admin: remove a member from the facility (keeps the user row, unlinks it).
-        [HttpDelete("{id}")]
+        [HttpDelete("{id:guid}")]
         public async Task<IActionResult> RemoveUser(Guid id)
         {
             var me = await CurrentUserAsync(_context);
