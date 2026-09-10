@@ -13,7 +13,9 @@ namespace TrustedTransit.Api.Models
         public string SubscriptionStatus { get; set; } = "trial";       // trial | active | canceled | past_due
         public DateTime? TrialEndsAt { get; set; }
         public DateTime? SubscriptionRenewsAt { get; set; }
+        public bool CancelAtPeriodEnd { get; set; }
         public string StripeCustomerId { get; set; } = string.Empty;
+        public string StripeSubscriptionId { get; set; } = string.Empty;
 
         // Verified email domain of this facility's staff (e.g. "sunriseseniorliving.com"),
         // lowercased, no "@". Unique across facilities; null = no auto-join by domain.

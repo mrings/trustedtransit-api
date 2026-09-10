@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrustedTransit.Api.Data;
 using TrustedTransit.Api.Models;
+using TrustedTransit.Api.Services;
 
 namespace TrustedTransit.Api.Controllers
 {
@@ -10,11 +11,13 @@ namespace TrustedTransit.Api.Controllers
     public class SubscriptionController : BaseController
     {
         private readonly TrustedTransitDbContext _context;
+        private readonly StripeBillingService _stripe;
         private readonly ILogger<SubscriptionController> _logger;
 
-        public SubscriptionController(TrustedTransitDbContext context, ILogger<SubscriptionController> logger)
+        public SubscriptionController(TrustedTransitDbContext context, StripeBillingService stripe, ILogger<SubscriptionController> logger)
         {
             _context = context;
+            _stripe = stripe;
             _logger = logger;
         }
 
@@ -28,57 +31,104 @@ namespace TrustedTransit.Api.Controllers
             var facility = await _context.Facilities.FirstAsync(f => f.Id == me.FacilityId);
             await BackfillTrialAsync(facility);
 
-            return Ok(BuildDto(facility, me.Role == Roles.Admin));
+            return Ok(BuildDto(facility, me.Role == Roles.Admin, _stripe.Enabled));
         }
 
-        // Admin: switch plan tier. Doesn't change trial/active status by itself.
+        // Admin: begin a paid subscription via Stripe Checkout. Returns { url } to redirect to.
+        [HttpPost("checkout")]
+        public async Task<ActionResult<UrlDto>> Checkout([FromBody] ChangePlanRequest request)
+        {
+            var (facility, error) = await GetAdminFacilityAsync();
+            if (error != null) return error;
+            var plan = Plans.Get(request.Tier);
+            if (plan == null) return BadRequest("Unknown plan.");
+            if (!_stripe.Enabled) return StatusCode(503, "Billing isn't configured.");
+
+            var url = await _stripe.CreateCheckoutUrlAsync(facility!, plan, RequestOrigin());
+            await _context.SaveChangesAsync();  // persists a newly-created StripeCustomerId
+            return Ok(new UrlDto { Url = url });
+        }
+
+        // Admin: open the Stripe Billing Portal (update card, cancel, invoices).
+        [HttpPost("portal")]
+        public async Task<ActionResult<UrlDto>> Portal()
+        {
+            var (facility, error) = await GetAdminFacilityAsync();
+            if (error != null) return error;
+            if (!_stripe.Enabled) return StatusCode(503, "Billing isn't configured.");
+            if (string.IsNullOrEmpty(facility!.StripeCustomerId))
+                return BadRequest("No billing account yet — subscribe first.");
+
+            var url = await _stripe.CreatePortalUrlAsync(facility, RequestOrigin());
+            return Ok(new UrlDto { Url = url });
+        }
+
+        // Admin: change the plan of an active subscription (proration via Stripe).
         [HttpPut]
         public async Task<IActionResult> ChangePlan([FromBody] ChangePlanRequest request)
         {
             var (facility, error) = await GetAdminFacilityAsync();
             if (error != null) return error;
-            if (!Plans.IsValid(request.Tier))
-                return BadRequest("Unknown plan.");
+            var plan = Plans.Get(request.Tier);
+            if (plan == null) return BadRequest("Unknown plan.");
 
-            facility!.SubscriptionTier = request.Tier!;
+            if (_stripe.Enabled && !string.IsNullOrEmpty(facility!.StripeSubscriptionId)
+                && facility.SubscriptionStatus is "active" or "past_due")
+            {
+                await _stripe.UpdatePlanAsync(facility, plan);
+                // Webhook will sync the tier; set it now for immediate feedback.
+            }
+
+            facility!.SubscriptionTier = plan.Key;
             facility.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Facility {FacilityId} plan -> {Tier}", facility.Id, request.Tier);
+            _logger.LogInformation("Facility {FacilityId} plan -> {Tier}", facility.Id, plan.Key);
             return NoContent();
         }
 
-        // Admin: start a paid subscription (from trial or canceled).
-        [HttpPost("activate")]
-        public async Task<IActionResult> Activate()
-        {
-            var (facility, error) = await GetAdminFacilityAsync();
-            if (error != null) return error;
-
-            facility!.SubscriptionStatus = "active";
-            facility.SubscriptionRenewsAt = DateTime.UtcNow.AddMonths(1);
-            facility.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-            _logger.LogInformation("Facility {FacilityId} subscription activated", facility.Id);
-            return NoContent();
-        }
-
-        // Admin: cancel. Access continues until SubscriptionRenewsAt (no hard gating yet).
+        // Admin: cancel at period end (Stripe when connected, otherwise local).
         [HttpPost("cancel")]
         public async Task<IActionResult> Cancel()
         {
             var (facility, error) = await GetAdminFacilityAsync();
             if (error != null) return error;
 
-            facility!.SubscriptionStatus = "canceled";
+            if (_stripe.Enabled && !string.IsNullOrEmpty(facility!.StripeSubscriptionId))
+                await _stripe.CancelAsync(facility);
+
+            facility!.CancelAtPeriodEnd = true;
+            if (facility.SubscriptionStatus == "trial")
+                facility.SubscriptionStatus = "canceled";
             facility.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
             _logger.LogInformation("Facility {FacilityId} subscription canceled", facility.Id);
             return NoContent();
         }
 
+        // Admin: undo a pending cancellation.
+        [HttpPost("resume")]
+        public async Task<IActionResult> Resume()
+        {
+            var (facility, error) = await GetAdminFacilityAsync();
+            if (error != null) return error;
+
+            if (_stripe.Enabled && !string.IsNullOrEmpty(facility!.StripeSubscriptionId))
+                await _stripe.ResumeAsync(facility);
+
+            facility!.CancelAtPeriodEnd = false;
+            if (facility.SubscriptionStatus == "canceled" && !string.IsNullOrEmpty(facility.StripeSubscriptionId))
+                facility.SubscriptionStatus = "active";
+            facility.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
         // --- helpers ----------------------------------------------------------
 
-        private async Task<(Facility?, IActionResult?)> GetAdminFacilityAsync()
+        private string RequestOrigin() =>
+            Request.Headers.Origin.ToString() is { Length: > 0 } o ? o.TrimEnd('/') : "https://trustedtransit-portal.vercel.app";
+
+        private async Task<(Facility?, ActionResult?)> GetAdminFacilityAsync()
         {
             var me = await CurrentUserAsync(_context);
             if (me == null) return (null, Unauthorized());
@@ -97,7 +147,7 @@ namespace TrustedTransit.Api.Controllers
             }
         }
 
-        private static SubscriptionDto BuildDto(Facility f, bool isAdmin)
+        private static SubscriptionDto BuildDto(Facility f, bool isAdmin, bool billingEnabled)
         {
             var plan = Plans.Get(f.SubscriptionTier);
             int? trialDaysLeft = f.TrialEndsAt.HasValue
@@ -112,7 +162,10 @@ namespace TrustedTransit.Api.Controllers
                 TrialEndsAt = f.TrialEndsAt,
                 TrialDaysLeft = trialDaysLeft,
                 RenewsAt = f.SubscriptionRenewsAt,
+                CancelAtPeriodEnd = f.CancelAtPeriodEnd,
+                HasStripeSubscription = !string.IsNullOrEmpty(f.StripeSubscriptionId),
                 CanManage = isAdmin,
+                BillingEnabled = billingEnabled,
                 Plans = PlanList(),
             };
         }
@@ -137,7 +190,10 @@ namespace TrustedTransit.Api.Controllers
         public DateTime? TrialEndsAt { get; set; }
         public int? TrialDaysLeft { get; set; }
         public DateTime? RenewsAt { get; set; }
+        public bool CancelAtPeriodEnd { get; set; }
+        public bool HasStripeSubscription { get; set; }
         public bool CanManage { get; set; }
+        public bool BillingEnabled { get; set; }
         public List<PlanDto> Plans { get; set; } = new();
     }
 
@@ -153,5 +209,10 @@ namespace TrustedTransit.Api.Controllers
     public class ChangePlanRequest
     {
         public string? Tier { get; set; }
+    }
+
+    public class UrlDto
+    {
+        public string Url { get; set; } = "";
     }
 }

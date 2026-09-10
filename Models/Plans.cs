@@ -1,6 +1,10 @@
 namespace TrustedTransit.Api.Models
 {
-    public record Plan(string Key, string Name, int MonthlyPriceCents, string Description, string[] Features);
+    public record Plan(string Key, string Name, int MonthlyPriceCents, string Description, string[] Features)
+    {
+        /// <summary>Stripe Price lookup_key — how StripeService finds/creates the recurring price.</summary>
+        public string StripeLookupKey => $"tt_{Key}_monthly";
+    }
 
     /// <summary>The subscription plan catalog. Placeholder pricing — edit here.</summary>
     public static class Plans
@@ -22,6 +26,9 @@ namespace TrustedTransit.Api.Models
 
         public static Plan? Get(string? key) =>
             key == null ? null : All.FirstOrDefault(p => p.Key == key);
+
+        public static Plan? ByLookupKey(string? lookupKey) =>
+            lookupKey == null ? null : All.FirstOrDefault(p => p.StripeLookupKey == lookupKey);
 
         public static bool IsValid(string? key) => Get(key) != null;
     }
