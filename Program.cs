@@ -84,9 +84,12 @@ app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
     await context.Response.WriteAsJsonAsync(new
     {
         type = "https://tools.ietf.org/html/rfc9110#section-15.6.1",
-        title = isDbConstraint ? "A referenced record was not found or already exists." : "An unexpected error occurred.",
+        title = isDbConstraint
+            ? "That change references a record that doesn't exist, or one that already exists."
+            : "An unexpected error occurred.",
         status = context.Response.StatusCode,
-        detail = ex?.GetBaseException().Message
+        // Only leak exception text in development.
+        detail = app.Environment.IsDevelopment() ? ex?.GetBaseException().Message : null
     });
 }));
 
