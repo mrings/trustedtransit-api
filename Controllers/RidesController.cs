@@ -24,14 +24,24 @@ namespace TrustedTransit.Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<RideDto>>> GetRides([FromQuery] string? status = null)
         {
-            var facilityId = await CurrentFacilityIdAsync(_context);
-            if (facilityId == null)
-                return Ok(Array.Empty<RideDto>());
+            var user = await GetOrCreateCurrentUserAsync(_context);
 
-            // Keep recurring-ride generation rolling forward.
-            await RideSeriesController.TopUpAsync(_context, facilityId.Value);
-
-            var query = _context.Rides.Where(r => r.FacilityId == facilityId);
+            IQueryable<Ride> query;
+            if (user?.Role == Roles.Driver)
+            {
+                // A driver sees rides assigned to them (from today onward, plus recently completed).
+                var driver = await GetOrCreateCurrentDriverAsync(_context);
+                var since = DateTime.UtcNow.AddHours(-12);
+                query = _context.Rides.Where(r => r.DriverId == driver!.Id && r.ScheduledPickupTime >= since);
+            }
+            else
+            {
+                var facilityId = user?.FacilityId;
+                if (facilityId == null)
+                    return Ok(Array.Empty<RideDto>());
+                await RideSeriesController.TopUpAsync(_context, facilityId.Value);
+                query = _context.Rides.Where(r => r.FacilityId == facilityId);
+            }
 
             if (!string.IsNullOrEmpty(status))
                 query = query.Where(r => r.Status == status);
@@ -129,13 +139,34 @@ namespace TrustedTransit.Api.Controllers
         [HttpPatch("{id}")]
         public async Task<IActionResult> UpdateRide(Guid id, [FromBody] UpdateRideRequest request)
         {
-            var facilityId = await CurrentFacilityIdAsync(_context);
             var ride = await _context.Rides
                 .Include(r => r.Resident)
                 .Include(r => r.Driver)
-                .FirstOrDefaultAsync(r => r.Id == id && r.FacilityId == facilityId);
+                .FirstOrDefaultAsync(r => r.Id == id);
             if (ride == null)
                 return NotFound();
+
+            var user = await GetOrCreateCurrentUserAsync(_context);
+            var isFacilityStaff = user?.FacilityId != null && user.FacilityId == ride.FacilityId;
+            var isAssignedDriver = false;
+            if (user?.Role == Roles.Driver)
+            {
+                var myDriver = await GetOrCreateCurrentDriverAsync(_context);
+                isAssignedDriver = ride.DriverId == myDriver!.Id;
+            }
+            if (!isFacilityStaff && !isAssignedDriver)
+                return NotFound();
+
+            // A driver assigned to the ride can only move its status.
+            if (isAssignedDriver && !isFacilityStaff)
+            {
+                var driverEdit = request.DriverId != null || request.UnassignDriver == true
+                    || request.BaseFare != null || request.MileageCharge != null || request.PaymentStatus != null
+                    || request.ScheduledPickupTime != null || request.PickupAddress != null
+                    || request.DestinationAddress != null || request.AppointmentType != null;
+                if (driverEdit)
+                    return StatusCode(403, "Drivers can only update ride status.");
+            }
 
             var oldDriverId = ride.DriverId;
             var oldStatus = ride.Status;
@@ -204,7 +235,7 @@ namespace TrustedTransit.Api.Controllers
 
         private async Task NotifyFamilyAsync(Ride ride, string ev)
         {
-            var facility = await CurrentFacilityAsync(_context);
+            var facility = await _context.Facilities.FirstOrDefaultAsync(f => f.Id == ride.FacilityId);
             if (facility is not { NotificationsEnabled: true } || ride.Resident == null)
                 return;
             if (string.IsNullOrWhiteSpace(ride.Resident.FamilyEmail) && string.IsNullOrWhiteSpace(ride.Resident.FamilyPhone))

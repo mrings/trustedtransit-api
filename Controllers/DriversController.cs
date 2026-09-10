@@ -38,11 +38,55 @@ namespace TrustedTransit.Api.Controllers
                     VehicleType = d.VehicleType,
                     VehiclePlate = d.VehiclePlate,
                     Rating = d.Rating,
-                    Status = d.Status
+                    Status = d.Status,
+                    LocationLat = d.LocationLat,
+                    LocationLng = d.LocationLng,
+                    LastLocationUpdate = d.LastLocationUpdate
                 })
                 .ToListAsync();
 
             return Ok(drivers);
+        }
+
+        // The driver-role caller's own record (get-or-created).
+        [HttpGet("me")]
+        public async Task<ActionResult<DriverDetailDto>> GetMyDriver()
+        {
+            var driver = await GetOrCreateCurrentDriverAsync(_context);
+            if (driver == null)
+                return StatusCode(403, "Not a driver account.");
+            return Ok(ToDetailDto(driver));
+        }
+
+        [HttpPatch("me")]
+        public async Task<IActionResult> UpdateMyDriver([FromBody] UpdateDriverRequest request)
+        {
+            var driver = await GetOrCreateCurrentDriverAsync(_context);
+            if (driver == null)
+                return StatusCode(403, "Not a driver account.");
+
+            driver.FirstName = request.FirstName ?? driver.FirstName;
+            driver.LastName = request.LastName ?? driver.LastName;
+            driver.Phone = request.Phone ?? driver.Phone;
+            driver.VehicleType = request.VehicleType ?? driver.VehicleType;
+            driver.VehiclePlate = request.VehiclePlate ?? driver.VehiclePlate;
+            driver.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        [HttpPost("me/location")]
+        public async Task<IActionResult> UpdateMyLocation([FromBody] UpdateLocationRequest request)
+        {
+            var driver = await GetOrCreateCurrentDriverAsync(_context);
+            if (driver == null)
+                return StatusCode(403, "Not a driver account.");
+
+            driver.LocationLat = request.Latitude;
+            driver.LocationLng = request.Longitude;
+            driver.LastLocationUpdate = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return NoContent();
         }
 
         [HttpGet("{id}")]
@@ -54,21 +98,24 @@ namespace TrustedTransit.Api.Controllers
             if (driver == null)
                 return NotFound();
 
-            return Ok(new DriverDetailDto
-            {
-                Id = driver.Id,
-                FirstName = driver.FirstName,
-                LastName = driver.LastName,
-                Phone = driver.Phone,
-                VehicleType = driver.VehicleType,
-                VehiclePlate = driver.VehiclePlate,
-                BackgroundCheckStatus = driver.BackgroundCheckStatus,
-                Rating = driver.Rating,
-                Status = driver.Status,
-                LocationLat = driver.LocationLat,
-                LocationLng = driver.LocationLng
-            });
+            return Ok(ToDetailDto(driver));
         }
+
+        private static DriverDetailDto ToDetailDto(Driver d) => new()
+        {
+            Id = d.Id,
+            FirstName = d.FirstName,
+            LastName = d.LastName,
+            Phone = d.Phone,
+            VehicleType = d.VehicleType,
+            VehiclePlate = d.VehiclePlate,
+            BackgroundCheckStatus = d.BackgroundCheckStatus,
+            Rating = d.Rating,
+            Status = d.Status,
+            LocationLat = d.LocationLat,
+            LocationLng = d.LocationLng,
+            LastLocationUpdate = d.LastLocationUpdate,
+        };
 
         // Admin only. Drivers aren't facility-scoped yet (shared provider pool).
         [HttpPost]
@@ -176,6 +223,9 @@ namespace TrustedTransit.Api.Controllers
         public string VehiclePlate { get; set; }
         public decimal Rating { get; set; }
         public string Status { get; set; }
+        public decimal? LocationLat { get; set; }
+        public decimal? LocationLng { get; set; }
+        public DateTime? LastLocationUpdate { get; set; }
     }
 
     public class DriverDetailDto
@@ -191,6 +241,7 @@ namespace TrustedTransit.Api.Controllers
         public string Status { get; set; }
         public decimal? LocationLat { get; set; }
         public decimal? LocationLng { get; set; }
+        public DateTime? LastLocationUpdate { get; set; }
     }
 
     public class CreateDriverRequest

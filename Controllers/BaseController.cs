@@ -182,6 +182,26 @@ namespace TrustedTransit.Api.Controllers
         protected async Task<Guid?> CurrentFacilityIdAsync(TrustedTransitDbContext db) =>
             (await GetOrCreateCurrentUserAsync(db))?.FacilityId;
 
+        /// <summary>
+        /// The Driver record for a driver-role caller, get-or-created and linked by UserId.
+        /// Null if the caller isn't a driver.
+        /// </summary>
+        protected async Task<Driver?> GetOrCreateCurrentDriverAsync(TrustedTransitDbContext db)
+        {
+            var user = await GetOrCreateCurrentUserAsync(db);
+            if (user == null || user.Role != Roles.Driver)
+                return null;
+
+            var driver = await db.Drivers.FirstOrDefaultAsync(d => d.UserId == user.Id);
+            if (driver == null)
+            {
+                driver = new Driver { UserId = user.Id, Status = "active" };
+                db.Drivers.Add(driver);
+                await db.SaveChangesAsync();
+            }
+            return driver;
+        }
+
         /// <summary>The caller's facility with its trial end backfilled, or null.</summary>
         protected async Task<Facility?> CurrentFacilityAsync(TrustedTransitDbContext db)
         {
