@@ -114,9 +114,13 @@ namespace TrustedTransit.Api.Controllers
             resident.FirstName = request.FirstName ?? resident.FirstName;
             resident.LastName = request.LastName ?? resident.LastName;
             resident.Phone = request.Phone ?? resident.Phone;
+            if (request.DateOfBirth.HasValue)
+                resident.DateOfBirth = ToUtc(request.DateOfBirth.Value);
             resident.MobilityRequirements = request.MobilityRequirements ?? resident.MobilityRequirements;
             resident.MedicalInfo = request.MedicalInfo ?? resident.MedicalInfo;
+            resident.Notes = request.Notes ?? resident.Notes;
             resident.FamilyEmail = request.FamilyEmail ?? resident.FamilyEmail;
+            resident.Status = request.Status ?? resident.Status;
             resident.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -185,8 +189,11 @@ namespace TrustedTransit.Api.Controllers
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? Phone { get; set; }
+        public DateTime? DateOfBirth { get; set; }
         public string? MobilityRequirements { get; set; }
         public string? MedicalInfo { get; set; }
+        public string? Notes { get; set; }
         public string? FamilyEmail { get; set; }
+        public string? Status { get; set; }
     }
 }

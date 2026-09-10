@@ -36,6 +36,7 @@ namespace TrustedTransit.Api.Controllers
                     LastName = d.LastName,
                     Phone = d.Phone,
                     VehicleType = d.VehicleType,
+                    VehiclePlate = d.VehiclePlate,
                     Rating = d.Rating,
                     Status = d.Status
                 })
@@ -113,11 +114,34 @@ namespace TrustedTransit.Api.Controllers
             driver.FirstName = request.FirstName ?? driver.FirstName;
             driver.LastName = request.LastName ?? driver.LastName;
             driver.Phone = request.Phone ?? driver.Phone;
+            driver.VehicleType = request.VehicleType ?? driver.VehicleType;
+            driver.VehiclePlate = request.VehiclePlate ?? driver.VehiclePlate;
             driver.Status = request.Status ?? driver.Status;
             driver.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             _logger.LogInformation("Driver {DriverId} updated", id);
+
+            return NoContent();
+        }
+
+        // Admin only. Unassigns the driver from any rides, then deletes.
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteDriver(Guid id)
+        {
+            if (await CheckAdminAsync(_context) is { } err) return err;
+
+            var driver = await _context.Drivers.FindAsync(id);
+            if (driver == null)
+                return NotFound();
+
+            var assignedRides = await _context.Rides.Where(r => r.DriverId == id).ToListAsync();
+            foreach (var ride in assignedRides)
+                ride.DriverId = null;
+
+            _context.Drivers.Remove(driver);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Driver {DriverId} deleted ({RideCount} rides unassigned)", id, assignedRides.Count);
 
             return NoContent();
         }
@@ -149,6 +173,7 @@ namespace TrustedTransit.Api.Controllers
         public string LastName { get; set; }
         public string Phone { get; set; }
         public string VehicleType { get; set; }
+        public string VehiclePlate { get; set; }
         public decimal Rating { get; set; }
         public string Status { get; set; }
     }
@@ -182,6 +207,8 @@ namespace TrustedTransit.Api.Controllers
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? Phone { get; set; }
+        public string? VehicleType { get; set; }
+        public string? VehiclePlate { get; set; }
         public string? Status { get; set; }
     }
 
