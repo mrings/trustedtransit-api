@@ -161,6 +161,14 @@ namespace TrustedTransit.Api.Controllers
             ride.PickupAddress = request.PickupAddress ?? ride.PickupAddress;
             ride.DestinationAddress = request.DestinationAddress ?? ride.DestinationAddress;
             ride.AppointmentType = request.AppointmentType ?? ride.AppointmentType;
+
+            // Billing
+            if (request.BaseFare.HasValue) ride.BaseFare = Math.Max(0, request.BaseFare.Value);
+            if (request.MileageCharge.HasValue) ride.MileageCharge = Math.Max(0, request.MileageCharge.Value);
+            if (request.BaseFare.HasValue || request.MileageCharge.HasValue)
+                ride.TotalCharge = ride.BaseFare + ride.MileageCharge;
+            if (request.PaymentStatus != null) ride.PaymentStatus = request.PaymentStatus;
+
             ride.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -239,5 +247,8 @@ namespace TrustedTransit.Api.Controllers
         public string? PickupAddress { get; set; }
         public string? DestinationAddress { get; set; }
         public string? AppointmentType { get; set; }
+        public decimal? BaseFare { get; set; }
+        public decimal? MileageCharge { get; set; }
+        public string? PaymentStatus { get; set; }
     }
 }
