@@ -12,6 +12,7 @@ namespace TrustedTransit.Api.Data
         public DbSet<Resident> Residents { get; set; }
         public DbSet<Driver> Drivers { get; set; }
         public DbSet<Ride> Rides { get; set; }
+        public DbSet<RideSeries> RideSeries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -44,6 +45,16 @@ namespace TrustedTransit.Api.Data
                 .WithMany()
                 .HasForeignKey(f => f.ContactUserId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+
+            modelBuilder.Entity<RideSeries>()
+                .HasIndex(s => new { s.FacilityId, s.Active });
+
+            // Deleting a series leaves its generated rides in place (RideSeriesId set null).
+            modelBuilder.Entity<Ride>()
+                .HasOne(r => r.RideSeries)
+                .WithMany(s => s.Rides)
+                .HasForeignKey(r => r.RideSeriesId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

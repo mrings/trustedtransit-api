@@ -25,6 +25,9 @@ namespace TrustedTransit.Api.Controllers
             if (facilityId == null)
                 return Ok(Array.Empty<RideDto>());
 
+            // Keep recurring-ride generation rolling forward.
+            await RideSeriesController.TopUpAsync(_context, facilityId.Value);
+
             var query = _context.Rides.Where(r => r.FacilityId == facilityId);
 
             if (!string.IsNullOrEmpty(status))
@@ -40,6 +43,7 @@ namespace TrustedTransit.Api.Controllers
                     ResidentName = r.Resident!.FirstName + " " + r.Resident.LastName,
                     DriverId = r.DriverId,
                     DriverName = r.Driver != null ? r.Driver.FirstName + " " + r.Driver.LastName : null,
+                    Recurring = r.RideSeriesId != null,
                     ScheduledPickupTime = r.ScheduledPickupTime,
                     PickupAddress = r.PickupAddress,
                     DestinationAddress = r.DestinationAddress,
@@ -191,6 +195,7 @@ namespace TrustedTransit.Api.Controllers
         public string? ResidentName { get; set; }
         public Guid? DriverId { get; set; }
         public string? DriverName { get; set; }
+        public bool Recurring { get; set; }
         public DateTime ScheduledPickupTime { get; set; }
         public string PickupAddress { get; set; }
         public string DestinationAddress { get; set; }

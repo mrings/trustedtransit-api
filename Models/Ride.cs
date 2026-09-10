@@ -17,7 +17,12 @@ namespace TrustedTransit.Api.Models
         [ForeignKey("Driver")]
         public Guid? DriverId { get; set; }
         public Driver? Driver { get; set; }
-        
+
+        // Set when this ride was generated from a recurring pattern.
+        [ForeignKey("RideSeries")]
+        public Guid? RideSeriesId { get; set; }
+        public RideSeries? RideSeries { get; set; }
+
         public DateTime ScheduledPickupTime { get; set; }
         public DateTime? ActualPickupTime { get; set; }
         public DateTime? ActualDropoffTime { get; set; }
