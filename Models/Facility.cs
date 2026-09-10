@@ -9,8 +9,10 @@ namespace TrustedTransit.Api.Models
         public string State { get; set; } = string.Empty;
         public string Zip { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
-        public string SubscriptionTier { get; set; } = "starter";
-        public string SubscriptionStatus { get; set; } = "trial";
+        public string SubscriptionTier { get; set; } = "starter";       // Plans.All keys
+        public string SubscriptionStatus { get; set; } = "trial";       // trial | active | canceled | past_due
+        public DateTime? TrialEndsAt { get; set; }
+        public DateTime? SubscriptionRenewsAt { get; set; }
         public string StripeCustomerId { get; set; } = string.Empty;
 
         // Verified email domain of this facility's staff (e.g. "sunriseseniorliving.com"),
