@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrustedTransit.Api.Data;
 using TrustedTransit.Api.Models;
+using TrustedTransit.Api.Services;
 
 namespace TrustedTransit.Api.Controllers
 {
@@ -10,11 +11,13 @@ namespace TrustedTransit.Api.Controllers
     public class RidesController : BaseController
     {
         private readonly TrustedTransitDbContext _context;
+        private readonly NotificationService _notifications;
         private readonly ILogger<RidesController> _logger;
 
-        public RidesController(TrustedTransitDbContext context, ILogger<RidesController> logger)
+        public RidesController(TrustedTransitDbContext context, NotificationService notifications, ILogger<RidesController> logger)
         {
             _context = context;
+            _notifications = notifications;
             _logger = logger;
         }
 
@@ -44,6 +47,7 @@ namespace TrustedTransit.Api.Controllers
                     DriverId = r.DriverId,
                     DriverName = r.Driver != null ? r.Driver.FirstName + " " + r.Driver.LastName : null,
                     Recurring = r.RideSeriesId != null,
+                    NotificationCount = _context.RideNotifications.Count(n => n.RideId == r.Id),
                     ScheduledPickupTime = r.ScheduledPickupTime,
                     PickupAddress = r.PickupAddress,
                     DestinationAddress = r.DestinationAddress,
@@ -127,9 +131,15 @@ namespace TrustedTransit.Api.Controllers
         {
             var facilityId = await CurrentFacilityIdAsync(_context);
             var ride = await _context.Rides
+                .Include(r => r.Resident)
+                .Include(r => r.Driver)
                 .FirstOrDefaultAsync(r => r.Id == id && r.FacilityId == facilityId);
             if (ride == null)
                 return NotFound();
+
+            var oldDriverId = ride.DriverId;
+            var oldStatus = ride.Status;
+            string? notifyEvent = null;
 
             if (request.UnassignDriver == true)
             {
@@ -137,11 +147,15 @@ namespace TrustedTransit.Api.Controllers
             }
             else if (request.DriverId.HasValue)
             {
-                if (!await _context.Drivers.AnyAsync(d => d.Id == request.DriverId))
+                var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.Id == request.DriverId);
+                if (driver == null)
                     return BadRequest("Driver not found.");
                 ride.DriverId = request.DriverId;
+                ride.Driver = driver;
                 if (ride.Status == "scheduled")
                     ride.Status = "assigned";
+                if (oldDriverId != request.DriverId)
+                    notifyEvent = "assigned";
             }
 
             if (request.Status != null)
@@ -153,6 +167,15 @@ namespace TrustedTransit.Api.Controllers
                     ride.ActualPickupTime = DateTime.UtcNow;
                 if (request.Status == "completed")
                     ride.CompletedAt = DateTime.UtcNow;
+
+                if (request.Status != oldStatus)
+                    notifyEvent = request.Status switch
+                    {
+                        "in_progress" or "picked_up" => "en_route",
+                        "completed" => "completed",
+                        "cancelled" => "cancelled",
+                        _ => notifyEvent,
+                    };
             }
 
             if (request.ScheduledPickupTime.HasValue)
@@ -173,7 +196,26 @@ namespace TrustedTransit.Api.Controllers
             await _context.SaveChangesAsync();
             _logger.LogInformation("Ride {RideId} updated", id);
 
+            if (notifyEvent != null)
+                await NotifyFamilyAsync(ride, notifyEvent);
+
             return NoContent();
+        }
+
+        private async Task NotifyFamilyAsync(Ride ride, string ev)
+        {
+            var facility = await CurrentFacilityAsync(_context);
+            if (facility is not { NotificationsEnabled: true } || ride.Resident == null)
+                return;
+            if (string.IsNullOrWhiteSpace(ride.Resident.FamilyEmail) && string.IsNullOrWhiteSpace(ride.Resident.FamilyPhone))
+                return;
+
+            _notifications.Enqueue(new RideUpdate(
+                ride.Id, ride.FacilityId, ev,
+                ride.Resident.FirstName,
+                ride.Resident.FamilyEmail, ride.Resident.FamilyPhone,
+                ride.ScheduledPickupTime, ride.DestinationAddress,
+                ride.Driver is null ? null : $"{ride.Driver.FirstName} {ride.Driver.LastName}".Trim()));
         }
 
         // Facility-scoped hard delete.
@@ -203,6 +245,7 @@ namespace TrustedTransit.Api.Controllers
         public Guid? DriverId { get; set; }
         public string? DriverName { get; set; }
         public bool Recurring { get; set; }
+        public int NotificationCount { get; set; }
         public DateTime ScheduledPickupTime { get; set; }
         public string PickupAddress { get; set; }
         public string DestinationAddress { get; set; }

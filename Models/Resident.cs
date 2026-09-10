@@ -18,6 +18,7 @@ namespace TrustedTransit.Api.Models
         public string MedicalInfo { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;
         public string FamilyEmail { get; set; } = string.Empty;
+        public string FamilyPhone { get; set; } = string.Empty;
         public string Status { get; set; } = "active";
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

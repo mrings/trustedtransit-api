@@ -20,6 +20,9 @@ namespace TrustedTransit.Api.Models
         // Verified email domain of this facility's staff (e.g. "sunriseseniorliving.com"),
         // lowercased, no "@". Unique across facilities; null = no auto-join by domain.
         public string? EmailDomain { get; set; }
+
+        // Send ride-status notifications to residents' families.
+        public bool NotificationsEnabled { get; set; } = true;
         
         // Relationship configured in TrustedTransitDbContext.OnModelCreating.
         public Guid? ContactUserId { get; set; }

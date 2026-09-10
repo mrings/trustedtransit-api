@@ -13,6 +13,7 @@ namespace TrustedTransit.Api.Data
         public DbSet<Driver> Drivers { get; set; }
         public DbSet<Ride> Rides { get; set; }
         public DbSet<RideSeries> RideSeries { get; set; }
+        public DbSet<RideNotification> RideNotifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -48,6 +49,13 @@ namespace TrustedTransit.Api.Data
 
             modelBuilder.Entity<RideSeries>()
                 .HasIndex(s => new { s.FacilityId, s.Active });
+
+            modelBuilder.Entity<RideNotification>()
+                .HasIndex(n => n.RideId);
+            modelBuilder.Entity<RideNotification>()
+                .HasOne(n => n.Ride).WithMany()
+                .HasForeignKey(n => n.RideId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Deleting a series leaves its generated rides in place (RideSeriesId set null).
             modelBuilder.Entity<Ride>()

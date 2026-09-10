@@ -19,7 +19,9 @@ builder.Services.AddControllers(options =>
     options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
 });
 
+builder.Services.AddHttpClient();
 builder.Services.AddSingleton<TrustedTransit.Api.Services.StripeBillingService>();
+builder.Services.AddSingleton<TrustedTransit.Api.Services.NotificationService>();
 
 
 // Add Database

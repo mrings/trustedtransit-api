@@ -64,6 +64,7 @@ namespace TrustedTransit.Api.Controllers
                 MedicalInfo = resident.MedicalInfo,
                 Notes = resident.Notes,
                 FamilyEmail = resident.FamilyEmail,
+                FamilyPhone = resident.FamilyPhone,
                 Status = resident.Status
             });
         }
@@ -94,6 +95,7 @@ namespace TrustedTransit.Api.Controllers
                 MedicalInfo = request.MedicalInfo ?? string.Empty,
                 Notes = request.Notes ?? string.Empty,
                 FamilyEmail = request.FamilyEmail ?? string.Empty,
+                FamilyPhone = request.FamilyPhone ?? string.Empty,
                 Status = "active"
             };
 
@@ -128,6 +130,7 @@ namespace TrustedTransit.Api.Controllers
             resident.MedicalInfo = request.MedicalInfo ?? resident.MedicalInfo;
             resident.Notes = request.Notes ?? resident.Notes;
             resident.FamilyEmail = request.FamilyEmail ?? resident.FamilyEmail;
+            resident.FamilyPhone = request.FamilyPhone ?? resident.FamilyPhone;
             resident.Status = request.Status ?? resident.Status;
             resident.UpdatedAt = DateTime.UtcNow;
 
@@ -177,6 +180,7 @@ namespace TrustedTransit.Api.Controllers
         public string MedicalInfo { get; set; }
         public string Notes { get; set; }
         public string FamilyEmail { get; set; }
+        public string FamilyPhone { get; set; }
         public string Status { get; set; }
     }
 
@@ -190,6 +194,7 @@ namespace TrustedTransit.Api.Controllers
         public string? MedicalInfo { get; set; }
         public string? Notes { get; set; }
         public string? FamilyEmail { get; set; }
+        public string? FamilyPhone { get; set; }
     }
 
     public class UpdateResidentRequest
@@ -202,6 +207,7 @@ namespace TrustedTransit.Api.Controllers
         public string? MedicalInfo { get; set; }
         public string? Notes { get; set; }
         public string? FamilyEmail { get; set; }
+        public string? FamilyPhone { get; set; }
         public string? Status { get; set; }
     }
 }
