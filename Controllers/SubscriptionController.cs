@@ -31,7 +31,8 @@ namespace TrustedTransit.Api.Controllers
             var facility = await _context.Facilities.FirstAsync(f => f.Id == me.FacilityId);
             await BackfillTrialAsync(facility);
 
-            return Ok(BuildDto(facility, me.Role == Roles.Admin, _stripe.Enabled));
+            var residentCount = await _context.Residents.CountAsync(r => r.FacilityId == facility.Id);
+            return Ok(BuildDto(facility, me.Role == Roles.Admin, _stripe.Enabled, residentCount));
         }
 
         // Admin: begin a paid subscription via Stripe Checkout. Returns { url } to redirect to.
@@ -147,17 +148,18 @@ namespace TrustedTransit.Api.Controllers
             }
         }
 
-        private static SubscriptionDto BuildDto(Facility f, bool isAdmin, bool billingEnabled)
+        private static SubscriptionDto BuildDto(Facility f, bool isAdmin, bool billingEnabled, int residentCount)
         {
-            var plan = Plans.Get(f.SubscriptionTier);
+            var plan = Plans.Resolve(f.SubscriptionTier);
             int? trialDaysLeft = f.TrialEndsAt.HasValue
                 ? (int)Math.Ceiling((f.TrialEndsAt.Value - DateTime.UtcNow).TotalDays)
                 : null;
+            var canWrite = Entitlements.CanWrite(f);
             return new SubscriptionDto
             {
                 Tier = f.SubscriptionTier,
-                PlanName = plan?.Name ?? f.SubscriptionTier,
-                MonthlyPriceCents = plan?.MonthlyPriceCents ?? 0,
+                PlanName = plan.Name,
+                MonthlyPriceCents = plan.MonthlyPriceCents,
                 Status = f.SubscriptionStatus,
                 TrialEndsAt = f.TrialEndsAt,
                 TrialDaysLeft = trialDaysLeft,
@@ -166,6 +168,11 @@ namespace TrustedTransit.Api.Controllers
                 HasStripeSubscription = !string.IsNullOrEmpty(f.StripeSubscriptionId),
                 CanManage = isAdmin,
                 BillingEnabled = billingEnabled,
+                CanWrite = canWrite,
+                BlockedReason = canWrite ? null : Entitlements.BlockedReason(f),
+                ResidentCount = residentCount,
+                ResidentLimit = plan.UnlimitedResidents ? null : plan.ResidentLimit,
+                RecurringRidesAllowed = plan.RecurringRides,
                 Plans = PlanList(),
             };
         }
@@ -178,6 +185,8 @@ namespace TrustedTransit.Api.Controllers
                 MonthlyPriceCents = p.MonthlyPriceCents,
                 Description = p.Description,
                 Features = p.Features,
+                ResidentLimit = p.UnlimitedResidents ? null : p.ResidentLimit,
+                RecurringRides = p.RecurringRides,
             }).ToList();
     }
 
@@ -194,6 +203,11 @@ namespace TrustedTransit.Api.Controllers
         public bool HasStripeSubscription { get; set; }
         public bool CanManage { get; set; }
         public bool BillingEnabled { get; set; }
+        public bool CanWrite { get; set; }
+        public string? BlockedReason { get; set; }
+        public int ResidentCount { get; set; }
+        public int? ResidentLimit { get; set; }
+        public bool RecurringRidesAllowed { get; set; }
         public List<PlanDto> Plans { get; set; } = new();
     }
 
@@ -204,6 +218,8 @@ namespace TrustedTransit.Api.Controllers
         public int MonthlyPriceCents { get; set; }
         public string Description { get; set; } = "";
         public string[] Features { get; set; } = System.Array.Empty<string>();
+        public int? ResidentLimit { get; set; }
+        public bool RecurringRides { get; set; }
     }
 
     public class ChangePlanRequest

@@ -182,6 +182,35 @@ namespace TrustedTransit.Api.Controllers
         protected async Task<Guid?> CurrentFacilityIdAsync(TrustedTransitDbContext db) =>
             (await GetOrCreateCurrentUserAsync(db))?.FacilityId;
 
+        /// <summary>The caller's facility with its trial end backfilled, or null.</summary>
+        protected async Task<Facility?> CurrentFacilityAsync(TrustedTransitDbContext db)
+        {
+            var id = await CurrentFacilityIdAsync(db);
+            if (id == null) return null;
+            var facility = await db.Facilities.FirstAsync(f => f.Id == id);
+            if (facility.SubscriptionStatus == "trial" && facility.TrialEndsAt == null)
+            {
+                facility.TrialEndsAt = facility.CreatedAt.AddDays(Plans.TrialDays);
+                await db.SaveChangesAsync();
+            }
+            return facility;
+        }
+
+        /// <summary>
+        /// The caller's facility, or a 400/402 result: 400 if unlinked, 402 (Payment Required)
+        /// if the plan/subscription state doesn't allow creating new records.
+        /// </summary>
+        protected async Task<(Facility? facility, ActionResult? error)> RequireWritableFacilityAsync(TrustedTransitDbContext db)
+        {
+            var facility = await CurrentFacilityAsync(db);
+            if (facility == null)
+                return (null, BadRequest("Your account isn't linked to a facility yet."));
+            if (!Entitlements.CanWrite(facility))
+                return (null, StatusCode(StatusCodes.Status402PaymentRequired,
+                    $"{Entitlements.BlockedReason(facility)} Subscribe to keep adding residents and rides."));
+            return (facility, null);
+        }
+
         /// <summary>Lowercases and strips a leading "@"/whitespace from an email domain; null/empty -> null.</summary>
         protected static string? NormalizeEmailDomain(string? domain)
         {

@@ -55,9 +55,13 @@ namespace TrustedTransit.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<RideSeriesDto>> CreateSeries([FromBody] RideSeriesRequest request)
         {
-            var facilityId = await CurrentFacilityIdAsync(_context);
-            if (facilityId == null)
-                return BadRequest("Your account isn't linked to a facility yet.");
+            var (facility, error) = await RequireWritableFacilityAsync(_context);
+            if (error != null) return error;
+            var facilityId = facility!.Id;
+
+            if (!Plans.Resolve(facility.SubscriptionTier).RecurringRides)
+                return StatusCode(StatusCodes.Status402PaymentRequired,
+                    "Recurring rides are available on the Pro plan. Upgrade to use them.");
 
             if (!await _context.Residents.AnyAsync(r => r.Id == request.ResidentId && r.FacilityId == facilityId))
                 return BadRequest("Resident not found in this facility.");
@@ -81,7 +85,7 @@ namespace TrustedTransit.Api.Controllers
 
             var series = new RideSeries
             {
-                FacilityId = facilityId.Value,
+                FacilityId = facilityId,
                 ResidentId = request.ResidentId,
                 DriverId = request.DriverId,
                 PickupAddress = request.PickupAddress ?? string.Empty,
@@ -175,9 +179,19 @@ namespace TrustedTransit.Api.Controllers
 
         // --- generation ---------------------------------------------------------
 
-        /// <summary>Ensures every active series in the facility has rides generated out to the horizon.</summary>
+        /// <summary>
+        /// Ensures every active series in the facility has rides generated out to the horizon.
+        /// A no-op for facilities not on a recurring-rides plan or with a lapsed subscription
+        /// (existing generated rides stay; the series just stops extending).
+        /// </summary>
         public static async Task TopUpAsync(TrustedTransitDbContext db, Guid facilityId)
         {
+            var facility = await db.Facilities.FirstOrDefaultAsync(f => f.Id == facilityId);
+            if (facility == null
+                || !Models.Plans.Resolve(facility.SubscriptionTier).RecurringRides
+                || !Models.Entitlements.CanWrite(facility))
+                return;
+
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var horizon = today.AddDays(HorizonDays);
             var series = await db.RideSeries.Where(s => s.FacilityId == facilityId && s.Active).ToListAsync();

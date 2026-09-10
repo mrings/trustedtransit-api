@@ -71,13 +71,21 @@ namespace TrustedTransit.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<ResidentDto>> CreateResident([FromBody] CreateResidentRequest request)
         {
-            var facilityId = await CurrentFacilityIdAsync(_context);
-            if (facilityId == null)
-                return BadRequest("Your account isn't linked to a facility yet.");
+            var (facility, error) = await RequireWritableFacilityAsync(_context);
+            if (error != null) return error;
+
+            var plan = Plans.Resolve(facility!.SubscriptionTier);
+            if (!plan.UnlimitedResidents)
+            {
+                var count = await _context.Residents.CountAsync(r => r.FacilityId == facility.Id);
+                if (count >= plan.ResidentLimit)
+                    return StatusCode(StatusCodes.Status402PaymentRequired,
+                        $"The {plan.Name} plan is limited to {plan.ResidentLimit} residents. Upgrade to add more.");
+            }
 
             var resident = new Resident
             {
-                FacilityId = facilityId.Value,
+                FacilityId = facility.Id,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
                 Phone = request.Phone,

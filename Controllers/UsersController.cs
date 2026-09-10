@@ -76,6 +76,8 @@ namespace TrustedTransit.Api.Controllers
             if (user == null)
                 return Unauthorized();
 
+            var facility = await CurrentFacilityAsync(_context);
+
             return Ok(new UserDetailDto
             {
                 Id = user.Id,
@@ -84,6 +86,8 @@ namespace TrustedTransit.Api.Controllers
                 Role = user.Role,
                 Status = user.Status,
                 FacilityId = user.FacilityId,
+                SubscriptionStatus = facility?.SubscriptionStatus,
+                SubscriptionActive = facility != null && Entitlements.CanWrite(facility),
                 CreatedAt = user.CreatedAt
             });
         }
@@ -200,6 +204,8 @@ namespace TrustedTransit.Api.Controllers
         public string Role { get; set; }
         public string Status { get; set; }
         public Guid? FacilityId { get; set; }
+        public string? SubscriptionStatus { get; set; }
+        public bool SubscriptionActive { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 

@@ -86,19 +86,18 @@ namespace TrustedTransit.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<RideDto>> CreateRide([FromBody] CreateRideRequest request)
         {
-            var facilityId = await CurrentFacilityIdAsync(_context);
-            if (facilityId == null)
-                return BadRequest("Your account isn't linked to a facility yet.");
+            var (facility, error) = await RequireWritableFacilityAsync(_context);
+            if (error != null) return error;
 
             // The resident must belong to that facility.
             var residentOk = await _context.Residents
-                .AnyAsync(r => r.Id == request.ResidentId && r.FacilityId == facilityId);
+                .AnyAsync(r => r.Id == request.ResidentId && r.FacilityId == facility!.Id);
             if (!residentOk)
                 return BadRequest("Resident not found in this facility.");
 
             var ride = new Ride
             {
-                FacilityId = facilityId.Value,
+                FacilityId = facility!.Id,
                 ResidentId = request.ResidentId,
                 PickupAddress = request.PickupAddress ?? string.Empty,
                 DestinationAddress = request.DestinationAddress ?? string.Empty,
