@@ -6,8 +6,9 @@ namespace TrustedTransit.Api.Models
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         
+        // Null until the driver has a login account (driver app is not built yet).
         [ForeignKey("User")]
-        public Guid UserId { get; set; }
+        public Guid? UserId { get; set; }
         public User? User { get; set; }
 
         public string FirstName { get; set; } = string.Empty;
