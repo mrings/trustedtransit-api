@@ -31,15 +31,19 @@ namespace TrustedTransit.Api.Controllers
                 query = query.Where(r => r.Status == status);
 
             var rides = await query
+                .OrderBy(r => r.ScheduledPickupTime)
                 .Select(r => new RideDto
                 {
                     Id = r.Id,
                     FacilityId = r.FacilityId,
                     ResidentId = r.ResidentId,
+                    ResidentName = r.Resident!.FirstName + " " + r.Resident.LastName,
                     DriverId = r.DriverId,
+                    DriverName = r.Driver != null ? r.Driver.FirstName + " " + r.Driver.LastName : null,
                     ScheduledPickupTime = r.ScheduledPickupTime,
                     PickupAddress = r.PickupAddress,
                     DestinationAddress = r.DestinationAddress,
+                    AppointmentType = r.AppointmentType,
                     Status = r.Status
                 })
                 .ToListAsync();
@@ -116,7 +120,7 @@ namespace TrustedTransit.Api.Controllers
         }
 
         [HttpPatch("{id}")]
-        public async Task<IActionResult> UpdateRideStatus(Guid id, [FromBody] UpdateRideStatusRequest request)
+        public async Task<IActionResult> UpdateRide(Guid id, [FromBody] UpdateRideRequest request)
         {
             var facilityId = await CurrentFacilityIdAsync(_context);
             var ride = await _context.Rides
@@ -124,11 +128,56 @@ namespace TrustedTransit.Api.Controllers
             if (ride == null)
                 return NotFound();
 
-            ride.Status = request.Status ?? ride.Status;
+            if (request.UnassignDriver == true)
+            {
+                ride.DriverId = null;
+            }
+            else if (request.DriverId.HasValue)
+            {
+                if (!await _context.Drivers.AnyAsync(d => d.Id == request.DriverId))
+                    return BadRequest("Driver not found.");
+                ride.DriverId = request.DriverId;
+                if (ride.Status == "scheduled")
+                    ride.Status = "assigned";
+            }
+
+            if (request.Status != null)
+            {
+                ride.Status = request.Status;
+                if (request.Status == "completed" && ride.ActualDropoffTime == null)
+                    ride.ActualDropoffTime = DateTime.UtcNow;
+                if ((request.Status == "in_progress" || request.Status == "picked_up") && ride.ActualPickupTime == null)
+                    ride.ActualPickupTime = DateTime.UtcNow;
+                if (request.Status == "completed")
+                    ride.CompletedAt = DateTime.UtcNow;
+            }
+
+            if (request.ScheduledPickupTime.HasValue)
+                ride.ScheduledPickupTime = ToUtc(request.ScheduledPickupTime.Value);
+            ride.PickupAddress = request.PickupAddress ?? ride.PickupAddress;
+            ride.DestinationAddress = request.DestinationAddress ?? ride.DestinationAddress;
+            ride.AppointmentType = request.AppointmentType ?? ride.AppointmentType;
             ride.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Ride {RideId} status updated to {Status}", id, request.Status);
+            _logger.LogInformation("Ride {RideId} updated", id);
+
+            return NoContent();
+        }
+
+        // Facility-scoped hard delete.
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteRide(Guid id)
+        {
+            var facilityId = await CurrentFacilityIdAsync(_context);
+            var ride = await _context.Rides
+                .FirstOrDefaultAsync(r => r.Id == id && r.FacilityId == facilityId);
+            if (ride == null)
+                return NotFound();
+
+            _context.Rides.Remove(ride);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Ride {RideId} deleted", id);
 
             return NoContent();
         }
@@ -139,10 +188,13 @@ namespace TrustedTransit.Api.Controllers
         public Guid Id { get; set; }
         public Guid FacilityId { get; set; }
         public Guid ResidentId { get; set; }
+        public string? ResidentName { get; set; }
         public Guid? DriverId { get; set; }
+        public string? DriverName { get; set; }
         public DateTime ScheduledPickupTime { get; set; }
         public string PickupAddress { get; set; }
         public string DestinationAddress { get; set; }
+        public string AppointmentType { get; set; }
         public string Status { get; set; }
     }
 
@@ -173,8 +225,14 @@ namespace TrustedTransit.Api.Controllers
         public string? RideType { get; set; }
     }
 
-    public class UpdateRideStatusRequest
+    public class UpdateRideRequest
     {
         public string? Status { get; set; }
+        public Guid? DriverId { get; set; }
+        public bool? UnassignDriver { get; set; }
+        public DateTime? ScheduledPickupTime { get; set; }
+        public string? PickupAddress { get; set; }
+        public string? DestinationAddress { get; set; }
+        public string? AppointmentType { get; set; }
     }
 }
