@@ -128,17 +128,20 @@ namespace TrustedTransit.Api.Controllers
             if (me?.Role != Roles.Admin || me.FacilityId == null)
                 return Ok(Array.Empty<UserDto>());
 
-            var facility = await _context.Facilities.FirstAsync(f => f.Id == me.FacilityId);
             var users = await _context.Users
                 .Where(u => u.FacilityId == null && u.Role != Roles.Driver)
                 .OrderBy(u => u.CreatedAt)
                 .Select(u => new UserDto { Id = u.Id, Email = u.Email, Role = u.Role, Status = u.Status })
                 .ToListAsync();
 
-            // If the facility has an email domain, only surface matching addresses.
-            if (!string.IsNullOrEmpty(facility.EmailDomain))
+            // If the facility has claimed any domains, only surface matching addresses.
+            var myDomains = await _context.FacilityDomains
+                .Where(d => d.FacilityId == me.FacilityId)
+                .Select(d => d.Domain)
+                .ToListAsync();
+            if (myDomains.Count > 0)
                 users = users
-                    .Where(u => u.Email.EndsWith("@" + facility.EmailDomain, StringComparison.OrdinalIgnoreCase))
+                    .Where(u => myDomains.Any(d => u.Email.EndsWith("@" + d, StringComparison.OrdinalIgnoreCase)))
                     .ToList();
 
             return Ok(users);

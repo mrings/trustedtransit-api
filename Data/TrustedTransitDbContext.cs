@@ -14,6 +14,7 @@ namespace TrustedTransit.Api.Data
         public DbSet<Ride> Rides { get; set; }
         public DbSet<RideSeries> RideSeries { get; set; }
         public DbSet<RideNotification> RideNotifications { get; set; }
+        public DbSet<FacilityDomain> FacilityDomains { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -25,11 +26,16 @@ namespace TrustedTransit.Api.Data
             modelBuilder.Entity<Ride>()
                 .HasIndex(r => new { r.DriverId, r.Status });
 
-            // One facility per email domain (Postgres treats multiple NULLs as distinct,
-            // so facilities without a domain are unaffected).
-            modelBuilder.Entity<Facility>()
-                .HasIndex(f => f.EmailDomain)
+            // One facility per email domain — a facility can hold several domains, but each
+            // domain belongs to at most one facility.
+            modelBuilder.Entity<FacilityDomain>()
+                .HasIndex(d => d.Domain)
                 .IsUnique();
+            modelBuilder.Entity<FacilityDomain>()
+                .HasOne(d => d.Facility)
+                .WithMany(f => f.Domains)
+                .HasForeignKey(d => d.FacilityId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Facility and User reference each other (User.FacilityId = the user's facility;
             // Facility.ContactUserId = that facility's contact). Configure both as many-to-one

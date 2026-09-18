@@ -17,9 +17,9 @@ namespace TrustedTransit.Api.Models
         public string StripeCustomerId { get; set; } = string.Empty;
         public string StripeSubscriptionId { get; set; } = string.Empty;
 
-        // Verified email domain of this facility's staff (e.g. "sunriseseniorliving.com"),
-        // lowercased, no "@". Unique across facilities; null = no auto-join by domain.
-        public string? EmailDomain { get; set; }
+        // Verified staff email domains — see FacilityDomain. A facility can hold several
+        // (e.g. "acme.com" and "acme-senior.com").
+        public ICollection<FacilityDomain> Domains { get; set; } = new List<FacilityDomain>();
 
         // Send ride-status notifications to residents' families.
         public bool NotificationsEnabled { get; set; } = true;

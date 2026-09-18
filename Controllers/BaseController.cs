@@ -30,6 +30,9 @@ namespace TrustedTransit.Api.Controllers
             "proton.me", "protonmail.com", "gmx.com", "zoho.com", "yandex.com", "mail.com"
         };
 
+        /// <summary>True for consumer/personal email providers, which can never be claimed as a facility domain.</summary>
+        protected static bool IsConsumerEmailDomain(string domain) => ConsumerEmailDomains.Contains(domain);
+
         private User? _currentUser;
         private bool _currentUserLoaded;
 
@@ -191,31 +194,39 @@ namespace TrustedTransit.Api.Controllers
 
         /// <summary>
         /// Facility that owns the caller's email domain, or null when there's no match, the
-        /// email is unverified, the domain is a consumer provider, or more than one facility
-        /// claims it.
+        /// email is unverified, or the domain is a consumer provider.
         /// </summary>
         private async Task<Guid?> MatchFacilityByEmailDomainAsync(TrustedTransitDbContext db, string email)
         {
-            // Block only when we positively know the email is unverified.
-            if (string.Equals(GetEmailVerified(), "false", StringComparison.OrdinalIgnoreCase) || _userInfoVerified == false)
+            if (!IsCurrentEmailVerified())
                 return null;
 
+            var domain = EmailDomainOf(email);
+            if (domain == null || IsConsumerEmailDomain(domain))
+                return null;
+
+            return await db.FacilityDomains
+                .Where(d => d.Domain == domain)
+                .Select(d => (Guid?)d.FacilityId)
+                .FirstOrDefaultAsync();
+        }
+
+        /// <summary>The domain part of an email address, lowercased; null if not a valid shape.</summary>
+        protected static string? EmailDomainOf(string email)
+        {
             var at = email.LastIndexOf('@');
             if (at < 0 || at == email.Length - 1)
                 return null;
-
             var domain = email[(at + 1)..].Trim().ToLowerInvariant();
-            if (domain.Length == 0 || ConsumerEmailDomains.Contains(domain))
-                return null;
-
-            var matches = await db.Facilities
-                .Where(f => f.EmailDomain == domain)
-                .Select(f => f.Id)
-                .Take(2)
-                .ToListAsync();
-
-            return matches.Count == 1 ? matches[0] : null;
+            return domain.Length == 0 ? null : domain;
         }
+
+        /// <summary>
+        /// Whether the caller's current email is positively known to be verified. Permissive by
+        /// design — "not explicitly false" — since not every claim source carries email_verified.
+        /// </summary>
+        protected bool IsCurrentEmailVerified() =>
+            !string.Equals(GetEmailVerified(), "false", StringComparison.OrdinalIgnoreCase) && _userInfoVerified != false;
 
         /// <summary>The authenticated caller's facility, or null if they aren't linked to one.</summary>
         protected async Task<Guid?> CurrentFacilityIdAsync(TrustedTransitDbContext db) =>
