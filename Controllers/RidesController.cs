@@ -97,6 +97,26 @@ namespace TrustedTransit.Api.Controllers
             });
         }
 
+        // Staff-only: the no-login family tracking link for this ride, generating one if this
+        // ride predates the feature.
+        [HttpGet("{id}/tracking-link")]
+        public async Task<ActionResult<TrackingLinkDto>> GetTrackingLink(Guid id)
+        {
+            var facilityId = await CurrentFacilityIdAsync(_context);
+            var ride = await _context.Rides.FirstOrDefaultAsync(r => r.Id == id && r.FacilityId == facilityId);
+            if (ride == null)
+                return NotFound();
+
+            if (ride.TrackingToken == null)
+            {
+                ride.TrackingToken = GenerateTrackingToken();
+                ride.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new TrackingLinkDto { Token = ride.TrackingToken });
+        }
+
         [HttpPost]
         public async Task<ActionResult<RideDto>> CreateRide([FromBody] CreateRideRequest request)
         {
@@ -120,7 +140,8 @@ namespace TrustedTransit.Api.Controllers
                 RideType = request.RideType ?? "one-time",
                 Status = "scheduled",
                 BaseFare = 10.00m,
-                TotalCharge = 10.00m
+                TotalCharge = 10.00m,
+                TrackingToken = GenerateTrackingToken()
             };
 
             _context.Rides.Add(ride);
@@ -241,12 +262,19 @@ namespace TrustedTransit.Api.Controllers
             if (string.IsNullOrWhiteSpace(ride.Resident.FamilyEmail) && string.IsNullOrWhiteSpace(ride.Resident.FamilyPhone))
                 return;
 
+            if (ride.TrackingToken == null && ev != "cancelled")
+            {
+                ride.TrackingToken = GenerateTrackingToken();
+                await _context.SaveChangesAsync();
+            }
+
             _notifications.Enqueue(new RideUpdate(
                 ride.Id, ride.FacilityId, ev,
                 ride.Resident.FirstName,
                 ride.Resident.FamilyEmail, ride.Resident.FamilyPhone,
                 ride.ScheduledPickupTime, ride.DestinationAddress,
-                ride.Driver is null ? null : $"{ride.Driver.FirstName} {ride.Driver.LastName}".Trim()));
+                ride.Driver is null ? null : $"{ride.Driver.FirstName} {ride.Driver.LastName}".Trim(),
+                ev == "cancelled" ? null : ride.TrackingToken));
         }
 
         // Facility-scoped hard delete.
@@ -299,6 +327,11 @@ namespace TrustedTransit.Api.Controllers
         public string Status { get; set; }
         public decimal BaseFare { get; set; }
         public decimal TotalCharge { get; set; }
+    }
+
+    public class TrackingLinkDto
+    {
+        public string Token { get; set; } = "";
     }
 
     public class CreateRideRequest

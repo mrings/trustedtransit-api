@@ -9,7 +9,7 @@ namespace TrustedTransit.Api.Services
         Guid RideId, Guid FacilityId, string Event,
         string ResidentFirstName, string FamilyEmail, string FamilyPhone,
         DateTime ScheduledPickupTime, string DestinationAddress,
-        string? DriverName);
+        string? DriverName, string? TrackingToken);
 
     /// <summary>
     /// Sends ride-status notifications to residents' families. Email via Resend, SMS via Twilio.
@@ -66,7 +66,10 @@ namespace TrustedTransit.Api.Services
             }
         }
 
-        private static (string subject, string body) Compose(RideUpdate u)
+        // Used when no Portal:BaseUrl is configured.
+        private const string DefaultPortalBaseUrl = "https://trustedtransit-portal.vercel.app";
+
+        private (string subject, string body) Compose(RideUpdate u)
         {
             var when = u.ScheduledPickupTime.ToString("MMM d 'at' h:mm tt") + " UTC";
             var name = u.ResidentFirstName;
@@ -79,6 +82,13 @@ namespace TrustedTransit.Api.Services
                 "cancelled" => $"{name}'s ride scheduled for {when} has been cancelled.",
                 _ => $"Update on {name}'s ride ({when}).",
             };
+
+            if (!string.IsNullOrEmpty(u.TrackingToken))
+            {
+                var baseUrl = (_config["Portal:BaseUrl"] ?? DefaultPortalBaseUrl).TrimEnd('/');
+                body += $"\n\nTrack this ride: {baseUrl}/track/{u.TrackingToken}";
+            }
+
             return ($"TrustedTransit: ride update for {name}", body + "\n\n— TrustedTransit");
         }
 

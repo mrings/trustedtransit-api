@@ -43,6 +43,10 @@ namespace TrustedTransit.Api.Models
         public string SpecialInstructions { get; set; } = string.Empty;
         
         public string Status { get; set; } = "scheduled";
+
+        // Unguessable key for the no-login family tracking page (/track/{token}). Null until
+        // first generated (at creation, or lazily when a share link is requested).
+        public string? TrackingToken { get; set; }
         
         [Column(TypeName = "numeric(8,2)")]
         public decimal BaseFare { get; set; } = 10.00m;

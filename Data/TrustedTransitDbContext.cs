@@ -28,6 +28,12 @@ namespace TrustedTransit.Api.Data
             modelBuilder.Entity<Ride>()
                 .HasIndex(r => new { r.DriverId, r.Status });
 
+            // Nulls are distinct under a unique index (Postgres default), so old rides without
+            // a token yet don't collide.
+            modelBuilder.Entity<Ride>()
+                .HasIndex(r => r.TrackingToken)
+                .IsUnique();
+
             // One facility per email domain — a facility can hold several domains, but each
             // domain belongs to at most one facility.
             modelBuilder.Entity<FacilityDomain>()

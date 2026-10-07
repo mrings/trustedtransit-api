@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TrustedTransit.Api.Data;
@@ -11,9 +12,11 @@ using TrustedTransit.Api.Data;
 namespace TrustedTransit.Api.Migrations
 {
     [DbContext(typeof(TrustedTransitDbContext))]
-    partial class TrustedTransitDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007204012_AddRideTrackingToken")]
+    partial class AddRideTrackingToken
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -342,6 +342,13 @@ namespace TrustedTransit.Api.Controllers
             return (facility, null);
         }
 
+        /// <summary>A 128-bit, URL-safe random token for no-login share links (e.g. ride tracking).</summary>
+        protected static string GenerateTrackingToken()
+        {
+            var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
+            return Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
+        }
+
         /// <summary>Lowercases and strips a leading "@"/whitespace from an email domain; null/empty -> null.</summary>
         protected static string? NormalizeEmailDomain(string? domain)
         {
