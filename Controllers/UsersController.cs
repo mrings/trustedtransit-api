@@ -120,6 +120,32 @@ namespace TrustedTransit.Api.Controllers
             return NoContent();
         }
 
+        /// <summary>
+        /// Self-serve: declare yourself an independent driver. Drivers are never attached to a
+        /// facility (they're a separate company, bookable by any facility) — this is the only
+        /// way to become one; a facility admin can't assign the driver role to their own staff.
+        /// </summary>
+        [HttpPost("me/driver")]
+        public async Task<IActionResult> BecomeDriver()
+        {
+            var user = await GetOrCreateCurrentUserAsync(_context);
+            if (user == null)
+                return Unauthorized();
+
+            if (user.FacilityId != null)
+                return BadRequest("Your account is linked to a facility — an independent driver account can't also be facility staff.");
+
+            if (user.Role != Roles.Driver)
+            {
+                user.Role = Roles.Driver;
+                user.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("User {UserId} self-declared as an independent driver", user.Id);
+            }
+
+            return NoContent();
+        }
+
         // Admin: people who have signed in but aren't attached to any facility yet.
         [HttpGet("unlinked")]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetUnlinked()
@@ -188,7 +214,9 @@ namespace TrustedTransit.Api.Controllers
             if (request.Role != null)
             {
                 if (!Roles.IsValid(request.Role))
-                    return BadRequest($"Invalid role. Use: {Roles.Admin}, {Roles.User}, {Roles.Driver}.");
+                    return BadRequest($"Invalid role. Use: {Roles.Admin} or {Roles.User}.");
+                if (request.Role == Roles.Driver)
+                    return BadRequest("Drivers aren't facility staff — they're independent and sign up on their own (see the sign-in screen).");
 
                 // Don't let an admin demote the facility's last admin (including themselves).
                 if (user.Role == Roles.Admin && request.Role != Roles.Admin)
