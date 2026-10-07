@@ -6,10 +6,17 @@ namespace TrustedTransit.Api.Models
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         
-        // Null until the driver has a login account (driver app is not built yet).
+        // Null until the driver has a login account.
         [ForeignKey("User")]
         public Guid? UserId { get; set; }
         public User? User { get; set; }
+
+        // Null = independent driver, not affiliated with any NEMT company. Facilities assign
+        // from the same shared pool either way — this is purely for the company's own roster
+        // management and display, not a scheduling restriction.
+        [ForeignKey("TransportCompany")]
+        public Guid? TransportCompanyId { get; set; }
+        public TransportCompany? TransportCompany { get; set; }
 
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;

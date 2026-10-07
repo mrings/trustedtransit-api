@@ -86,6 +86,7 @@ namespace TrustedTransit.Api.Controllers
                 Role = user.Role,
                 Status = user.Status,
                 FacilityId = user.FacilityId,
+                TransportCompanyId = user.TransportCompanyId,
                 SubscriptionStatus = facility?.SubscriptionStatus,
                 SubscriptionActive = facility != null && Entitlements.CanWrite(facility),
                 CreatedAt = user.CreatedAt
@@ -281,6 +282,7 @@ namespace TrustedTransit.Api.Controllers
         public string Role { get; set; }
         public string Status { get; set; }
         public Guid? FacilityId { get; set; }
+        public Guid? TransportCompanyId { get; set; }
         public string? SubscriptionStatus { get; set; }
         public bool SubscriptionActive { get; set; }
         public DateTime CreatedAt { get; set; }

@@ -41,7 +41,9 @@ namespace TrustedTransit.Api.Controllers
                     Status = d.Status,
                     LocationLat = d.LocationLat,
                     LocationLng = d.LocationLng,
-                    LastLocationUpdate = d.LastLocationUpdate
+                    LastLocationUpdate = d.LastLocationUpdate,
+                    TransportCompanyName = d.TransportCompany != null ? d.TransportCompany.Name : null,
+                    HasLogin = d.UserId != null,
                 })
                 .ToListAsync();
 
@@ -93,6 +95,7 @@ namespace TrustedTransit.Api.Controllers
         public async Task<ActionResult<DriverDetailDto>> GetDriver(Guid id)
         {
             var driver = await _context.Drivers
+                .Include(d => d.TransportCompany)
                 .FirstOrDefaultAsync(d => d.Id == id);
 
             if (driver == null)
@@ -115,6 +118,9 @@ namespace TrustedTransit.Api.Controllers
             LocationLat = d.LocationLat,
             LocationLng = d.LocationLng,
             LastLocationUpdate = d.LastLocationUpdate,
+            TransportCompanyId = d.TransportCompanyId,
+            TransportCompanyName = d.TransportCompany?.Name,
+            HasLogin = d.UserId != null,
         };
 
         // Admin only. Drivers aren't facility-scoped yet (shared provider pool).
@@ -226,6 +232,9 @@ namespace TrustedTransit.Api.Controllers
         public decimal? LocationLat { get; set; }
         public decimal? LocationLng { get; set; }
         public DateTime? LastLocationUpdate { get; set; }
+        public Guid? TransportCompanyId { get; set; }
+        public string? TransportCompanyName { get; set; }
+        public bool HasLogin { get; set; }
     }
 
     public class DriverDetailDto
@@ -242,6 +251,9 @@ namespace TrustedTransit.Api.Controllers
         public decimal? LocationLat { get; set; }
         public decimal? LocationLng { get; set; }
         public DateTime? LastLocationUpdate { get; set; }
+        public Guid? TransportCompanyId { get; set; }
+        public string? TransportCompanyName { get; set; }
+        public bool HasLogin { get; set; }
     }
 
     public class CreateDriverRequest

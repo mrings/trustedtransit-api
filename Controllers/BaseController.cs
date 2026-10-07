@@ -132,13 +132,19 @@ namespace TrustedTransit.Api.Controllers
                 user.UpdatedAt = DateTime.UtcNow;
             }
 
-            if (user.FacilityId == null)
+            if (user.FacilityId == null && user.TransportCompanyId == null)
             {
                 var facilityId = await MatchFacilityByEmailDomainAsync(db, email);
                 if (facilityId != null)
                     await AssignFacilityAsync(db, user, facilityId.Value);
+                else
+                {
+                    var companyId = await MatchTransportCompanyByEmailDomainAsync(db, email);
+                    if (companyId != null)
+                        await AssignDriverToCompanyAsync(db, user, companyId.Value);
+                }
             }
-            else if (user.Role != Roles.Admin)
+            else if (user.FacilityId != null && user.Role != Roles.Admin)
             {
                 // Invariant: a populated facility always has an admin. If it lost/never had one,
                 // its earliest member is promoted. (Also heals users linked before roles existed.)
@@ -176,6 +182,31 @@ namespace TrustedTransit.Api.Controllers
             user.UpdatedAt = DateTime.UtcNow;
         }
 
+        /// <summary>
+        /// Puts a user on a transport company's driver roster via email-domain match. Unlike
+        /// <see cref="AssignFacilityAsync"/>, this never promotes to admin — company admin is
+        /// only established by whoever registers the company (<c>POST /api/companies</c>), not
+        /// by whoever happens to log in first.
+        /// </summary>
+        protected async Task AssignDriverToCompanyAsync(TrustedTransitDbContext db, User user, Guid companyId)
+        {
+            user.TransportCompanyId = companyId;
+            user.Role = Roles.Driver;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            var driver = await db.Drivers.FirstOrDefaultAsync(d => d.UserId == user.Id);
+            if (driver == null)
+            {
+                driver = new Driver { UserId = user.Id, TransportCompanyId = companyId, Status = "active" };
+                db.Drivers.Add(driver);
+            }
+            else
+            {
+                driver.TransportCompanyId = companyId;
+                driver.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
         /// <summary>The resolved current user, or null if unauthenticated.</summary>
         protected Task<User?> CurrentUserAsync(TrustedTransitDbContext db) => GetOrCreateCurrentUserAsync(db);
 
@@ -211,6 +242,25 @@ namespace TrustedTransit.Api.Controllers
                 .FirstOrDefaultAsync();
         }
 
+        /// <summary>
+        /// Transport company that owns the caller's email domain, or null when there's no
+        /// match, the email is unverified, or the domain is a consumer provider.
+        /// </summary>
+        private async Task<Guid?> MatchTransportCompanyByEmailDomainAsync(TrustedTransitDbContext db, string email)
+        {
+            if (!IsCurrentEmailVerified())
+                return null;
+
+            var domain = EmailDomainOf(email);
+            if (domain == null || IsConsumerEmailDomain(domain))
+                return null;
+
+            return await db.TransportCompanyDomains
+                .Where(d => d.Domain == domain)
+                .Select(d => (Guid?)d.TransportCompanyId)
+                .FirstOrDefaultAsync();
+        }
+
         /// <summary>The domain part of an email address, lowercased; null if not a valid shape.</summary>
         protected static string? EmailDomainOf(string email)
         {
@@ -232,6 +282,17 @@ namespace TrustedTransit.Api.Controllers
         protected async Task<Guid?> CurrentFacilityIdAsync(TrustedTransitDbContext db) =>
             (await GetOrCreateCurrentUserAsync(db))?.FacilityId;
 
+        /// <summary>The authenticated caller's transport company, or null if they aren't linked to one.</summary>
+        protected async Task<Guid?> CurrentTransportCompanyIdAsync(TrustedTransitDbContext db) =>
+            (await GetOrCreateCurrentUserAsync(db))?.TransportCompanyId;
+
+        /// <summary>The caller's transport company, or null.</summary>
+        protected async Task<TransportCompany?> CurrentTransportCompanyAsync(TrustedTransitDbContext db)
+        {
+            var id = await CurrentTransportCompanyIdAsync(db);
+            return id == null ? null : await db.TransportCompanies.FirstOrDefaultAsync(c => c.Id == id);
+        }
+
         /// <summary>
         /// The Driver record for a driver-role caller, get-or-created and linked by UserId.
         /// Null if the caller isn't a driver.
@@ -242,10 +303,10 @@ namespace TrustedTransit.Api.Controllers
             if (user == null || user.Role != Roles.Driver)
                 return null;
 
-            var driver = await db.Drivers.FirstOrDefaultAsync(d => d.UserId == user.Id);
+            var driver = await db.Drivers.Include(d => d.TransportCompany).FirstOrDefaultAsync(d => d.UserId == user.Id);
             if (driver == null)
             {
-                driver = new Driver { UserId = user.Id, Status = "active" };
+                driver = new Driver { UserId = user.Id, TransportCompanyId = user.TransportCompanyId, Status = "active" };
                 db.Drivers.Add(driver);
                 await db.SaveChangesAsync();
             }

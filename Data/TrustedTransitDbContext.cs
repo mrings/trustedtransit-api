@@ -15,6 +15,8 @@ namespace TrustedTransit.Api.Data
         public DbSet<RideSeries> RideSeries { get; set; }
         public DbSet<RideNotification> RideNotifications { get; set; }
         public DbSet<FacilityDomain> FacilityDomains { get; set; }
+        public DbSet<TransportCompany> TransportCompanies { get; set; }
+        public DbSet<TransportCompanyDomain> TransportCompanyDomains { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -69,6 +71,40 @@ namespace TrustedTransit.Api.Data
                 .WithMany(s => s.Rides)
                 .HasForeignKey(r => r.RideSeriesId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // One transport company per email domain, same posture as FacilityDomain.
+            modelBuilder.Entity<TransportCompanyDomain>()
+                .HasIndex(d => d.Domain)
+                .IsUnique();
+            modelBuilder.Entity<TransportCompanyDomain>()
+                .HasOne(d => d.TransportCompany)
+                .WithMany(c => c.Domains)
+                .HasForeignKey(d => d.TransportCompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // TransportCompany and User reference each other the same way Facility/User do
+            // (User.TransportCompanyId = the admin's company; TransportCompany.ContactUserId =
+            // that company's contact) — configured explicitly so EF keeps them as two
+            // relationships instead of collapsing them into one 1:1.
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.TransportCompany)
+                .WithMany()
+                .HasForeignKey(u => u.TransportCompanyId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+
+            modelBuilder.Entity<TransportCompany>()
+                .HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.ContactUserId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+
+            // A driver's company roster membership — deleting a company unlinks its drivers
+            // rather than deleting their profiles/ride history.
+            modelBuilder.Entity<Driver>()
+                .HasOne(d => d.TransportCompany)
+                .WithMany(c => c.Drivers)
+                .HasForeignKey(d => d.TransportCompanyId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
         }
     }
 }
