@@ -39,7 +39,6 @@ namespace TrustedTransit.Api.Controllers
                 RidesToday = await rides.CountAsync(r =>
                     r.ScheduledPickupTime >= now.Date && r.ScheduledPickupTime < todayEnd),
                 CompletedThisMonth = await completedThisMonth.CountAsync(),
-                BilledThisMonth = await completedThisMonth.SumAsync(r => (decimal?)r.TotalCharge) ?? 0m,
             });
         }
     }
@@ -51,6 +50,5 @@ namespace TrustedTransit.Api.Controllers
         public int UpcomingRides { get; set; }
         public int RidesToday { get; set; }
         public int CompletedThisMonth { get; set; }
-        public decimal BilledThisMonth { get; set; }
     }
 }

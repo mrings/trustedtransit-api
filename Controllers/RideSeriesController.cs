@@ -238,8 +238,7 @@ namespace TrustedTransit.Api.Controllers
                     AppointmentType = series.AppointmentType,
                     RideType = "recurring",
                     Status = series.DriverId != null ? "assigned" : "scheduled",
-                    BaseFare = 10.00m,
-                    TotalCharge = 10.00m,
+                    TrackingToken = GenerateTrackingToken(),
                 });
             }
         }

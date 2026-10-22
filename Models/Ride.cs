@@ -47,18 +47,7 @@ namespace TrustedTransit.Api.Models
         // Unguessable key for the no-login family tracking page (/track/{token}). Null until
         // first generated (at creation, or lazily when a share link is requested).
         public string? TrackingToken { get; set; }
-        
-        [Column(TypeName = "numeric(8,2)")]
-        public decimal BaseFare { get; set; } = 10.00m;
-        
-        [Column(TypeName = "numeric(8,2)")]
-        public decimal MileageCharge { get; set; } = 0;
-        
-        [Column(TypeName = "numeric(8,2)")]
-        public decimal TotalCharge { get; set; } = 10.00m;
-        
-        public string PaymentStatus { get; set; } = "pending";
-        
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? CompletedAt { get; set; }

@@ -273,9 +273,6 @@ namespace TrustedTransit.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<decimal>("BaseFare")
-                        .HasColumnType("numeric(8,2)");
-
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -300,13 +297,6 @@ namespace TrustedTransit.Api.Migrations
 
                     b.Property<Guid>("FacilityId")
                         .HasColumnType("uuid");
-
-                    b.Property<decimal>("MileageCharge")
-                        .HasColumnType("numeric(8,2)");
-
-                    b.Property<string>("PaymentStatus")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<string>("PickupAddress")
                         .IsRequired()
@@ -338,9 +328,6 @@ namespace TrustedTransit.Api.Migrations
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<decimal>("TotalCharge")
-                        .HasColumnType("numeric(8,2)");
 
                     b.Property<string>("TrackingToken")
                         .HasColumnType("text");
