@@ -86,9 +86,11 @@ namespace TrustedTransit.Api.Controllers
                 Role = user.Role,
                 Status = user.Status,
                 FacilityId = user.FacilityId,
+                FacilityName = facility?.Name,
                 TransportCompanyId = user.TransportCompanyId,
+                IsSuperAdmin = user.IsSuperAdmin,
                 SubscriptionStatus = facility?.SubscriptionStatus,
-                SubscriptionActive = facility != null && Entitlements.CanWrite(facility),
+                SubscriptionActive = user.IsSuperAdmin || (facility != null && Entitlements.CanWrite(facility)),
                 CreatedAt = user.CreatedAt
             });
         }
@@ -282,7 +284,9 @@ namespace TrustedTransit.Api.Controllers
         public string Role { get; set; }
         public string Status { get; set; }
         public Guid? FacilityId { get; set; }
+        public string? FacilityName { get; set; }
         public Guid? TransportCompanyId { get; set; }
+        public bool IsSuperAdmin { get; set; }
         public string? SubscriptionStatus { get; set; }
         public bool SubscriptionActive { get; set; }
         public DateTime CreatedAt { get; set; }

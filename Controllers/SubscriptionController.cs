@@ -32,7 +32,7 @@ namespace TrustedTransit.Api.Controllers
             await BackfillTrialAsync(facility);
 
             var residentCount = await _context.Residents.CountAsync(r => r.FacilityId == facility.Id);
-            return Ok(BuildDto(facility, me.Role == Roles.Admin, _stripe.Enabled, residentCount));
+            return Ok(BuildDto(facility, me.Role == Roles.Admin, _stripe.Enabled, residentCount, me.IsSuperAdmin));
         }
 
         // Admin: begin a paid subscription via Stripe Checkout. Returns { url } to redirect to.
@@ -148,13 +148,13 @@ namespace TrustedTransit.Api.Controllers
             }
         }
 
-        private static SubscriptionDto BuildDto(Facility f, bool isAdmin, bool billingEnabled, int residentCount)
+        private static SubscriptionDto BuildDto(Facility f, bool isAdmin, bool billingEnabled, int residentCount, bool bypass = false)
         {
             var plan = Plans.Resolve(f.SubscriptionTier);
             int? trialDaysLeft = f.TrialEndsAt.HasValue
                 ? (int)Math.Ceiling((f.TrialEndsAt.Value - DateTime.UtcNow).TotalDays)
                 : null;
-            var canWrite = Entitlements.CanWrite(f);
+            var canWrite = bypass || Entitlements.CanWrite(f);
             return new SubscriptionDto
             {
                 Tier = f.SubscriptionTier,
@@ -171,8 +171,8 @@ namespace TrustedTransit.Api.Controllers
                 CanWrite = canWrite,
                 BlockedReason = canWrite ? null : Entitlements.BlockedReason(f),
                 ResidentCount = residentCount,
-                ResidentLimit = plan.UnlimitedResidents ? null : plan.ResidentLimit,
-                RecurringRidesAllowed = plan.RecurringRides,
+                ResidentLimit = bypass || plan.UnlimitedResidents ? null : plan.ResidentLimit,
+                RecurringRidesAllowed = bypass || plan.RecurringRides,
                 Plans = PlanList(),
             };
         }

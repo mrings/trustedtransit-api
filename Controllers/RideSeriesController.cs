@@ -59,7 +59,7 @@ namespace TrustedTransit.Api.Controllers
             if (error != null) return error;
             var facilityId = facility!.Id;
 
-            if (!Plans.Resolve(facility.SubscriptionTier).RecurringRides)
+            if (!Plans.Resolve(facility.SubscriptionTier).RecurringRides && !await IsSuperAdminAsync(_context))
                 return StatusCode(StatusCodes.Status402PaymentRequired,
                     "Recurring rides are available on the Pro plan. Upgrade to use them.");
 

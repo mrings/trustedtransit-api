@@ -132,7 +132,7 @@ namespace TrustedTransit.Api.Controllers
                 user.UpdatedAt = DateTime.UtcNow;
             }
 
-            if (user.FacilityId == null && user.TransportCompanyId == null)
+            if (user.FacilityId == null && user.TransportCompanyId == null && !user.IsSuperAdmin)
             {
                 var facilityId = await MatchFacilityByEmailDomainAsync(db, email);
                 if (facilityId != null)
@@ -213,6 +213,10 @@ namespace TrustedTransit.Api.Controllers
         /// <summary>True when the caller is an admin of their facility.</summary>
         protected async Task<bool> IsAdminAsync(TrustedTransitDbContext db) =>
             (await CurrentUserAsync(db))?.Role == Roles.Admin;
+
+        /// <summary>True for TrustedTransit platform staff — see <see cref="Models.User.IsSuperAdmin"/>.</summary>
+        protected async Task<bool> IsSuperAdminAsync(TrustedTransitDbContext db) =>
+            (await CurrentUserAsync(db))?.IsSuperAdmin == true;
 
         /// <summary>Null when the caller is an admin (of any facility); otherwise the error result to return.</summary>
         protected async Task<ActionResult?> CheckAdminAsync(TrustedTransitDbContext db)
@@ -336,7 +340,7 @@ namespace TrustedTransit.Api.Controllers
             var facility = await CurrentFacilityAsync(db);
             if (facility == null)
                 return (null, BadRequest("Your account isn't linked to a facility yet."));
-            if (!Entitlements.CanWrite(facility))
+            if (!await IsSuperAdminAsync(db) && !Entitlements.CanWrite(facility))
                 return (null, StatusCode(StatusCodes.Status402PaymentRequired,
                     $"{Entitlements.BlockedReason(facility)} Subscribe to keep adding residents and rides."));
             return (facility, null);

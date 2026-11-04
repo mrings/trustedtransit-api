@@ -555,6 +555,9 @@ namespace TrustedTransit.Api.Migrations
                     b.Property<Guid?>("FacilityId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsSuperAdmin")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("text");

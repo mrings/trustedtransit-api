@@ -21,6 +21,12 @@ namespace TrustedTransit.Api.Models
         public Guid? TransportCompanyId { get; set; }
         public TransportCompany? TransportCompany { get; set; }
 
+        // TrustedTransit platform staff (support desk). Orthogonal to Role/FacilityId —
+        // never set by any signup/auto-match path, only by a direct DB update. Bypasses
+        // every facility subscription/plan gate, and can impersonate any facility's admin
+        // via POST /api/support/facilities/{id}/impersonate (see SupportController).
+        public bool IsSuperAdmin { get; set; } = false;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }

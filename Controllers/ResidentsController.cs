@@ -76,7 +76,7 @@ namespace TrustedTransit.Api.Controllers
             if (error != null) return error;
 
             var plan = Plans.Resolve(facility!.SubscriptionTier);
-            if (!plan.UnlimitedResidents)
+            if (!plan.UnlimitedResidents && !await IsSuperAdminAsync(_context))
             {
                 var count = await _context.Residents.CountAsync(r => r.FacilityId == facility.Id);
                 if (count >= plan.ResidentLimit)
