@@ -134,14 +134,28 @@ namespace TrustedTransit.Api.Controllers
 
             if (user.FacilityId == null && user.TransportCompanyId == null && !user.IsSuperAdmin)
             {
-                var facilityId = await MatchFacilityByEmailDomainAsync(db, email);
-                if (facilityId != null)
-                    await AssignFacilityAsync(db, user, facilityId.Value);
+                // An explicit invite (an admin typed this exact email onto a placeholder driver)
+                // takes priority over a passive domain match — it's a stronger, specific signal.
+                var invitedDriver = await MatchInvitedDriverAsync(db, email, user.Id);
+                if (invitedDriver != null)
+                {
+                    invitedDriver.UserId = user.Id;
+                    invitedDriver.UpdatedAt = DateTime.UtcNow;
+                    user.TransportCompanyId = invitedDriver.TransportCompanyId;
+                    user.Role = Roles.Driver;
+                    user.UpdatedAt = DateTime.UtcNow;
+                }
                 else
                 {
-                    var companyId = await MatchTransportCompanyByEmailDomainAsync(db, email);
-                    if (companyId != null)
-                        await AssignDriverToCompanyAsync(db, user, companyId.Value);
+                    var facilityId = await MatchFacilityByEmailDomainAsync(db, email);
+                    if (facilityId != null)
+                        await AssignFacilityAsync(db, user, facilityId.Value);
+                    else
+                    {
+                        var companyId = await MatchTransportCompanyByEmailDomainAsync(db, email);
+                        if (companyId != null)
+                            await AssignDriverToCompanyAsync(db, user, companyId.Value);
+                    }
                 }
             }
             else if (user.FacilityId != null && user.Role != Roles.Admin)
@@ -269,6 +283,27 @@ namespace TrustedTransit.Api.Controllers
                 .FirstOrDefaultAsync();
         }
 
+        /// <summary>
+        /// A placeholder <see cref="Driver"/> (no login yet) that an admin invited by email —
+        /// matched by exact email, not domain, so it works for drivers without a claimed
+        /// company domain (or independent ones). Null if the email is unverified, malformed, has
+        /// no matching invite, or the caller already has their own driver row (never double-link).
+        /// </summary>
+        private async Task<Driver?> MatchInvitedDriverAsync(TrustedTransitDbContext db, string email, Guid userId)
+        {
+            if (!IsCurrentEmailVerified())
+                return null;
+
+            var normalized = NormalizeInviteEmail(email);
+            if (normalized.Length == 0 || !normalized.Contains('@'))
+                return null;
+
+            if (await db.Drivers.AnyAsync(d => d.UserId == userId))
+                return null;
+
+            return await db.Drivers.FirstOrDefaultAsync(d => d.UserId == null && d.Email == normalized);
+        }
+
         /// <summary>The domain part of an email address, lowercased; null if not a valid shape.</summary>
         protected static string? EmailDomainOf(string email)
         {
@@ -356,6 +391,9 @@ namespace TrustedTransit.Api.Controllers
             var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
             return Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
         }
+
+        /// <summary>Lowercases/trims an email for invite-matching on <see cref="Models.Driver.Email"/>; null -> empty.</summary>
+        protected static string NormalizeInviteEmail(string? email) => email?.Trim().ToLowerInvariant() ?? string.Empty;
 
         /// <summary>Lowercases and strips a leading "@"/whitespace from an email domain; null/empty -> null.</summary>
         protected static string? NormalizeEmailDomain(string? domain)

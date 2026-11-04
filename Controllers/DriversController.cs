@@ -37,6 +37,7 @@ namespace TrustedTransit.Api.Controllers
                     Phone = d.Phone,
                     VehicleType = d.VehicleType,
                     VehiclePlate = d.VehiclePlate,
+                    Email = d.Email,
                     BackgroundCheckStatus = d.BackgroundCheckStatus,
                     Rating = d.Rating,
                     Status = d.Status,
@@ -113,6 +114,7 @@ namespace TrustedTransit.Api.Controllers
             Phone = d.Phone,
             VehicleType = d.VehicleType,
             VehiclePlate = d.VehiclePlate,
+            Email = d.Email,
             BackgroundCheckStatus = d.BackgroundCheckStatus,
             Rating = d.Rating,
             Status = d.Status,
@@ -137,6 +139,7 @@ namespace TrustedTransit.Api.Controllers
                 Phone = request.Phone ?? string.Empty,
                 VehicleType = request.VehicleType ?? string.Empty,
                 VehiclePlate = request.VehiclePlate ?? string.Empty,
+                Email = NormalizeInviteEmail(request.Email),
                 BackgroundCheckStatus = "pending",
                 Rating = 0,
                 Status = "active"
@@ -170,6 +173,8 @@ namespace TrustedTransit.Api.Controllers
             driver.Phone = request.Phone ?? driver.Phone;
             driver.VehicleType = request.VehicleType ?? driver.VehicleType;
             driver.VehiclePlate = request.VehiclePlate ?? driver.VehiclePlate;
+            if (request.Email != null)
+                driver.Email = NormalizeInviteEmail(request.Email);
             driver.Status = request.Status ?? driver.Status;
             driver.UpdatedAt = DateTime.UtcNow;
 
@@ -228,6 +233,7 @@ namespace TrustedTransit.Api.Controllers
         public string Phone { get; set; }
         public string VehicleType { get; set; }
         public string VehiclePlate { get; set; }
+        public string? Email { get; set; }
         public string BackgroundCheckStatus { get; set; }
         public decimal Rating { get; set; }
         public string Status { get; set; }
@@ -247,6 +253,7 @@ namespace TrustedTransit.Api.Controllers
         public string Phone { get; set; }
         public string VehicleType { get; set; }
         public string VehiclePlate { get; set; }
+        public string? Email { get; set; }
         public string BackgroundCheckStatus { get; set; }
         public decimal Rating { get; set; }
         public string Status { get; set; }
@@ -265,6 +272,7 @@ namespace TrustedTransit.Api.Controllers
         public string? Phone { get; set; }
         public string? VehicleType { get; set; }
         public string? VehiclePlate { get; set; }
+        public string? Email { get; set; }
     }
 
     public class UpdateDriverRequest
@@ -274,6 +282,7 @@ namespace TrustedTransit.Api.Controllers
         public string? Phone { get; set; }
         public string? VehicleType { get; set; }
         public string? VehiclePlate { get; set; }
+        public string? Email { get; set; }
         public string? Status { get; set; }
     }
 

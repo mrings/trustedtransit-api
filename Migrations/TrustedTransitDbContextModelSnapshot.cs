@@ -38,6 +38,10 @@ namespace TrustedTransit.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -89,7 +93,7 @@ namespace TrustedTransit.Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Drivers", (string)null);
+                    b.ToTable("Drivers");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.Facility", b =>
@@ -163,7 +167,7 @@ namespace TrustedTransit.Api.Migrations
 
                     b.HasIndex("ContactUserId");
 
-                    b.ToTable("Facilities", (string)null);
+                    b.ToTable("Facilities");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.FacilityDomain", b =>
@@ -193,7 +197,7 @@ namespace TrustedTransit.Api.Migrations
 
                     b.HasIndex("FacilityId");
 
-                    b.ToTable("FacilityDomains", (string)null);
+                    b.ToTable("FacilityDomains");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.Resident", b =>
@@ -254,7 +258,7 @@ namespace TrustedTransit.Api.Migrations
 
                     b.HasIndex("FacilityId");
 
-                    b.ToTable("Residents", (string)null);
+                    b.ToTable("Residents");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.Ride", b =>
@@ -351,7 +355,7 @@ namespace TrustedTransit.Api.Migrations
 
                     b.HasIndex("FacilityId", "ScheduledPickupTime");
 
-                    b.ToTable("Rides", (string)null);
+                    b.ToTable("Rides");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.RideNotification", b =>
@@ -392,7 +396,7 @@ namespace TrustedTransit.Api.Migrations
 
                     b.HasIndex("RideId");
 
-                    b.ToTable("RideNotifications", (string)null);
+                    b.ToTable("RideNotifications");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.RideSeries", b =>
@@ -452,7 +456,7 @@ namespace TrustedTransit.Api.Migrations
 
                     b.HasIndex("FacilityId", "Active");
 
-                    b.ToTable("RideSeries", (string)null);
+                    b.ToTable("RideSeries");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.TransportCompany", b =>
@@ -502,7 +506,7 @@ namespace TrustedTransit.Api.Migrations
 
                     b.HasIndex("ContactUserId");
 
-                    b.ToTable("TransportCompanies", (string)null);
+                    b.ToTable("TransportCompanies");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.TransportCompanyDomain", b =>
@@ -532,7 +536,7 @@ namespace TrustedTransit.Api.Migrations
 
                     b.HasIndex("TransportCompanyId");
 
-                    b.ToTable("TransportCompanyDomains", (string)null);
+                    b.ToTable("TransportCompanyDomains");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.User", b =>
@@ -578,7 +582,7 @@ namespace TrustedTransit.Api.Migrations
 
                     b.HasIndex("TransportCompanyId");
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.Driver", b =>

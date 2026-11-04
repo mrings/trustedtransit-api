@@ -21,6 +21,15 @@ namespace TrustedTransit.Api.Models
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
+
+        // Lowercased invite email, set when an admin adds this driver as a placeholder (no
+        // UserId yet). The first time someone signs in with this exact verified email,
+        // BaseController.GetOrCreateCurrentUserAsync links their account to this row instead of
+        // creating a new one — this is how a company's own drivers (who have no claimed domain,
+        // or an independent-driver placeholder) ever get to log into the account the admin set
+        // up for them. Empty for placeholders added without an email, and irrelevant once
+        // UserId is set.
+        public string Email { get; set; } = string.Empty;
         public string VehicleType { get; set; } = string.Empty;
         public string VehiclePlate { get; set; } = string.Empty;
         // pending | approved | rejected. A super admin vets drivers (SupportController) — not

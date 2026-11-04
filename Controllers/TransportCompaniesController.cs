@@ -233,6 +233,7 @@ namespace TrustedTransit.Api.Controllers
                     Phone = d.Phone,
                     VehicleType = d.VehicleType,
                     VehiclePlate = d.VehiclePlate,
+                    Email = d.Email,
                     BackgroundCheckStatus = d.BackgroundCheckStatus,
                     Rating = d.Rating,
                     Status = d.Status,
@@ -264,6 +265,7 @@ namespace TrustedTransit.Api.Controllers
                 Phone = request.Phone ?? string.Empty,
                 VehicleType = request.VehicleType ?? string.Empty,
                 VehiclePlate = request.VehiclePlate ?? string.Empty,
+                Email = NormalizeInviteEmail(request.Email),
                 BackgroundCheckStatus = "pending",
                 Rating = 0,
                 Status = "active"
