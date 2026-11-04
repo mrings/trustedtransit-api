@@ -18,8 +18,11 @@ namespace TrustedTransit.Api.Models
         public string Zip { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
 
-        // active | suspended — a hook for a future vetting/approval step. Everyone active for now.
-        public string Status { get; set; } = "active";
+        // pending | active | rejected. New companies start pending; a super admin vets them
+        // (SupportController). Only "active" companies accept new drivers via domain auto-match
+        // (BaseController.MatchTransportCompanyByEmailDomainAsync) — vetting gates onboarding,
+        // not the company's own ability to set up its profile/roster while under review.
+        public string Status { get; set; } = "pending";
 
         // Verified staff (driver) email domains — see TransportCompanyDomain.
         public ICollection<TransportCompanyDomain> Domains { get; set; } = new List<TransportCompanyDomain>();

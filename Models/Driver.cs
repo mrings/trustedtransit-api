@@ -23,6 +23,10 @@ namespace TrustedTransit.Api.Models
         public string Phone { get; set; } = string.Empty;
         public string VehicleType { get; set; } = string.Empty;
         public string VehiclePlate { get; set; } = string.Empty;
+        // pending | approved | rejected. A super admin vets drivers (SupportController) — not
+        // the driver's own company or any facility, since that would defeat the point. Only
+        // "approved" + Status "active" drivers can be assigned to rides (RidesController,
+        // RideSeriesController) or shown in a facility's assign-driver list.
         public string BackgroundCheckStatus { get; set; } = "pending";
         public DateTime? BackgroundCheckDate { get; set; }
         public decimal Rating { get; set; } = 0;

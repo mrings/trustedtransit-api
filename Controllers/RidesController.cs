@@ -197,6 +197,8 @@ namespace TrustedTransit.Api.Controllers
                 var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.Id == request.DriverId);
                 if (driver == null)
                     return BadRequest("Driver not found.");
+                if (driver.Status != "active" || driver.BackgroundCheckStatus != "approved")
+                    return BadRequest("This driver hasn't passed vetting yet and can't be assigned to rides.");
                 ride.DriverId = request.DriverId;
                 ride.Driver = driver;
                 if (ride.Status == "scheduled")

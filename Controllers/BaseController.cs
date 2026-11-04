@@ -259,9 +259,13 @@ namespace TrustedTransit.Api.Controllers
             if (domain == null || IsConsumerEmailDomain(domain))
                 return null;
 
+            // Only a vetted ("active") company accepts new drivers via domain auto-match — a
+            // pending/rejected company can still configure its own profile and roster, just not
+            // pull in self-service signups yet.
             return await db.TransportCompanyDomains
                 .Where(d => d.Domain == domain)
-                .Select(d => (Guid?)d.TransportCompanyId)
+                .Join(db.TransportCompanies.Where(c => c.Status == "active"),
+                    d => d.TransportCompanyId, c => c.Id, (d, c) => (Guid?)c.Id)
                 .FirstOrDefaultAsync();
         }
 

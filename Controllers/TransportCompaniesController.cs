@@ -233,6 +233,7 @@ namespace TrustedTransit.Api.Controllers
                     Phone = d.Phone,
                     VehicleType = d.VehicleType,
                     VehiclePlate = d.VehiclePlate,
+                    BackgroundCheckStatus = d.BackgroundCheckStatus,
                     Rating = d.Rating,
                     Status = d.Status,
                     LocationLat = d.LocationLat,

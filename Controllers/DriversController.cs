@@ -37,6 +37,7 @@ namespace TrustedTransit.Api.Controllers
                     Phone = d.Phone,
                     VehicleType = d.VehicleType,
                     VehiclePlate = d.VehiclePlate,
+                    BackgroundCheckStatus = d.BackgroundCheckStatus,
                     Rating = d.Rating,
                     Status = d.Status,
                     LocationLat = d.LocationLat,
@@ -227,6 +228,7 @@ namespace TrustedTransit.Api.Controllers
         public string Phone { get; set; }
         public string VehicleType { get; set; }
         public string VehiclePlate { get; set; }
+        public string BackgroundCheckStatus { get; set; }
         public decimal Rating { get; set; }
         public string Status { get; set; }
         public decimal? LocationLat { get; set; }

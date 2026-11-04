@@ -65,8 +65,14 @@ namespace TrustedTransit.Api.Controllers
 
             if (!await _context.Residents.AnyAsync(r => r.Id == request.ResidentId && r.FacilityId == facilityId))
                 return BadRequest("Resident not found in this facility.");
-            if (request.DriverId.HasValue && !await _context.Drivers.AnyAsync(d => d.Id == request.DriverId))
-                return BadRequest("Driver not found.");
+            if (request.DriverId.HasValue)
+            {
+                var seriesDriver = await _context.Drivers.FirstOrDefaultAsync(d => d.Id == request.DriverId);
+                if (seriesDriver == null)
+                    return BadRequest("Driver not found.");
+                if (seriesDriver.Status != "active" || seriesDriver.BackgroundCheckStatus != "approved")
+                    return BadRequest("This driver hasn't passed vetting yet and can't be assigned to rides.");
+            }
             if (!TryParseDays(request.DaysOfWeek, out var days))
                 return BadRequest("Pick at least one day of the week.");
             if (!TimeOnly.TryParse(request.PickupTime, out var pickup))
@@ -115,8 +121,14 @@ namespace TrustedTransit.Api.Controllers
             if (series == null)
                 return NotFound();
 
-            if (request.DriverId.HasValue && !await _context.Drivers.AnyAsync(d => d.Id == request.DriverId))
-                return BadRequest("Driver not found.");
+            if (request.DriverId.HasValue)
+            {
+                var updateDriver = await _context.Drivers.FirstOrDefaultAsync(d => d.Id == request.DriverId);
+                if (updateDriver == null)
+                    return BadRequest("Driver not found.");
+                if (updateDriver.Status != "active" || updateDriver.BackgroundCheckStatus != "approved")
+                    return BadRequest("This driver hasn't passed vetting yet and can't be assigned to rides.");
+            }
 
             if (request.DaysOfWeek != null)
             {
