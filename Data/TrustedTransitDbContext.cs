@@ -17,6 +17,7 @@ namespace TrustedTransit.Api.Data
         public DbSet<FacilityDomain> FacilityDomains { get; set; }
         public DbSet<TransportCompany> TransportCompanies { get; set; }
         public DbSet<TransportCompanyDomain> TransportCompanyDomains { get; set; }
+        public DbSet<AuditLog> AuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -111,6 +112,9 @@ namespace TrustedTransit.Api.Data
                 .WithMany(c => c.Drivers)
                 .HasForeignKey(d => d.TransportCompanyId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+
+            modelBuilder.Entity<AuditLog>()
+                .HasIndex(a => a.CreatedAt);
         }
     }
 }

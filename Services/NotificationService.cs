@@ -40,6 +40,24 @@ namespace TrustedTransit.Api.Services
         /// <summary>Fire-and-forget. Failures are logged, never surfaced to the caller.</summary>
         public void Enqueue(RideUpdate update) => _ = Task.Run(() => SendAsync(update));
 
+        /// <summary>
+        /// Fire-and-forget plain email not tied to a ride (e.g. a vetting status change).
+        /// Skipped if Resend isn't configured or the address doesn't look like an email.
+        /// Unlike <see cref="Enqueue"/>, nothing is persisted — there's no RideNotification
+        /// record to attach it to.
+        /// </summary>
+        public void EnqueueEmail(string toEmail, string subject, string body)
+        {
+            if (!EmailEnabled || !LooksLikeEmail(toEmail))
+                return;
+            _ = Task.Run(async () =>
+            {
+                var (success, error) = await SendViaResendAsync(toEmail, subject, body);
+                if (!success)
+                    _logger.LogWarning("Email to {To} failed: {Error}", toEmail, error);
+            });
+        }
+
         private async Task SendAsync(RideUpdate u)
         {
             try
@@ -95,13 +113,21 @@ namespace TrustedTransit.Api.Services
         private async Task<RideNotification> SendEmailAsync(RideUpdate u, string subject, string body)
         {
             var rec = NewRecord(u, "email", u.FamilyEmail);
+            var (success, error) = await SendViaResendAsync(u.FamilyEmail, subject, body);
+            rec.Success = success;
+            rec.Error = error ?? "";
+            return rec;
+        }
+
+        private async Task<(bool success, string? error)> SendViaResendAsync(string to, string subject, string body)
+        {
             try
             {
                 var client = _http.CreateClient();
                 var payload = JsonSerializer.Serialize(new
                 {
                     from = _config["Notifications:FromEmail"],
-                    to = new[] { u.FamilyEmail },
+                    to = new[] { to },
                     subject,
                     text = body,
                 });
@@ -111,12 +137,11 @@ namespace TrustedTransit.Api.Services
                 };
                 req.Headers.Add("Authorization", $"Bearer {_config["Resend:ApiKey"]}");
                 var res = await client.SendAsync(req);
-                rec.Success = res.IsSuccessStatusCode;
-                if (!rec.Success)
-                    rec.Error = $"{(int)res.StatusCode} {await res.Content.ReadAsStringAsync()}";
+                if (res.IsSuccessStatusCode)
+                    return (true, null);
+                return (false, $"{(int)res.StatusCode} {await res.Content.ReadAsStringAsync()}");
             }
-            catch (Exception e) { rec.Error = e.Message; }
-            return rec;
+            catch (Exception e) { return (false, e.Message); }
         }
 
         private async Task<RideNotification> SendSmsAsync(RideUpdate u, string body)

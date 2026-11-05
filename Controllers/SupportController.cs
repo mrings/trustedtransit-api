@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TrustedTransit.Api.Data;
+using TrustedTransit.Api.Models;
+using TrustedTransit.Api.Services;
 
 namespace TrustedTransit.Api.Controllers
 {
@@ -14,10 +16,52 @@ namespace TrustedTransit.Api.Controllers
     public class SupportController : BaseController
     {
         private readonly TrustedTransitDbContext _context;
+        private readonly NotificationService _notifications;
 
-        public SupportController(TrustedTransitDbContext context)
+        public SupportController(TrustedTransitDbContext context, NotificationService notifications)
         {
             _context = context;
+            _notifications = notifications;
+        }
+
+        // Every super-admin action gets a row here — nothing in this controller does anything
+        // destructive or privileged without one. Written to _context but not saved; the caller
+        // saves alongside its own change so both land in the same transaction.
+        private void LogAction(User actor, string action, string targetType, Guid? targetId, string detail)
+        {
+            _context.AuditLogs.Add(new AuditLog
+            {
+                ActorUserId = actor.Id,
+                ActorEmail = actor.Email,
+                Action = action,
+                TargetType = targetType,
+                TargetId = targetId,
+                Detail = detail,
+            });
+        }
+
+        [HttpGet("audit-log")]
+        public async Task<ActionResult<IEnumerable<AuditLogDto>>> GetAuditLog()
+        {
+            if (!await IsSuperAdminAsync(_context))
+                return Forbid();
+
+            var entries = await _context.AuditLogs
+                .OrderByDescending(a => a.CreatedAt)
+                .Take(200)
+                .Select(a => new AuditLogDto
+                {
+                    Id = a.Id,
+                    ActorEmail = a.ActorEmail,
+                    Action = a.Action,
+                    TargetType = a.TargetType,
+                    TargetId = a.TargetId,
+                    Detail = a.Detail,
+                    CreatedAt = a.CreatedAt,
+                })
+                .ToListAsync();
+
+            return Ok(entries);
         }
 
         [HttpGet("drivers")]
@@ -59,16 +103,44 @@ namespace TrustedTransit.Api.Controllers
             if (request.Status is not ("pending" or "approved" or "rejected"))
                 return BadRequest("Status must be pending, approved, or rejected.");
 
+            var me = (await CurrentUserAsync(_context))!;
             var driver = await _context.Drivers.FindAsync(id);
             if (driver == null)
                 return NotFound();
 
+            var previousStatus = driver.BackgroundCheckStatus;
             driver.BackgroundCheckStatus = request.Status;
             driver.BackgroundCheckDate = DateTime.UtcNow;
             driver.UpdatedAt = DateTime.UtcNow;
+
+            LogAction(me, "vet_driver", "driver", driver.Id,
+                $"{previousStatus} -> {request.Status} ({driver.FirstName} {driver.LastName})");
             await _context.SaveChangesAsync();
 
+            if (previousStatus != request.Status)
+                await NotifyDriverVettingAsync(driver, request.Status);
+
             return NoContent();
+        }
+
+        // Tells the driver their background check changed — to their login email if they have
+        // one, otherwise the invite email an admin set on the placeholder row.
+        private async Task NotifyDriverVettingAsync(Driver driver, string status)
+        {
+            if (status is not ("approved" or "rejected"))
+                return;
+
+            var email = driver.UserId != null
+                ? await _context.Users.Where(u => u.Id == driver.UserId).Select(u => u.Email).FirstOrDefaultAsync()
+                : driver.Email;
+            if (string.IsNullOrWhiteSpace(email))
+                return;
+
+            var body = status == "approved"
+                ? $"Good news, {driver.FirstName} — your TrustedTransit background check has been approved. You're now eligible to be assigned rides."
+                : $"Hi {driver.FirstName}, your TrustedTransit background check wasn't approved, so you can't be assigned rides at this time. Contact your transport company for details.";
+
+            _notifications.EnqueueEmail(email, "TrustedTransit: background check update", body + "\n\n— TrustedTransit");
         }
 
         [HttpGet("companies")]
@@ -106,15 +178,45 @@ namespace TrustedTransit.Api.Controllers
             if (request.Status is not ("pending" or "active" or "rejected"))
                 return BadRequest("Status must be pending, active, or rejected.");
 
+            var me = (await CurrentUserAsync(_context))!;
             var company = await _context.TransportCompanies.FindAsync(id);
             if (company == null)
                 return NotFound();
 
+            var previousStatus = company.Status;
             company.Status = request.Status;
             company.UpdatedAt = DateTime.UtcNow;
+
+            LogAction(me, "vet_company", "transport_company", company.Id,
+                $"{previousStatus} -> {request.Status} ({company.Name})");
             await _context.SaveChangesAsync();
 
+            if (previousStatus != request.Status)
+                await NotifyCompanyVettingAsync(company, request.Status);
+
             return NoContent();
+        }
+
+        // Tells the company's admin their vetting status changed. A company has no single
+        // "contact email" field in use today — whoever registered it (POST /api/companies) is
+        // its admin, found by role, same as everywhere else in this app.
+        private async Task NotifyCompanyVettingAsync(TransportCompany company, string status)
+        {
+            if (status is not ("active" or "rejected"))
+                return;
+
+            var email = await _context.Users
+                .Where(u => u.TransportCompanyId == company.Id && u.Role == Roles.Admin)
+                .Select(u => u.Email)
+                .FirstOrDefaultAsync();
+            if (string.IsNullOrWhiteSpace(email))
+                return;
+
+            var body = status == "active"
+                ? $"Good news — {company.Name} has been approved on TrustedTransit. Your drivers can now be assigned rides once each one's own background check is approved."
+                : $"{company.Name}'s TrustedTransit application wasn't approved. Contact us if you have questions.";
+
+            _notifications.EnqueueEmail(email, "TrustedTransit: company status update", body + "\n\n— TrustedTransit");
         }
 
         [HttpGet("facilities")]
@@ -152,13 +254,16 @@ namespace TrustedTransit.Api.Controllers
                 return Forbid();
 
             var me = (await CurrentUserAsync(_context))!;
-            if (!await _context.Facilities.AnyAsync(f => f.Id == id))
+            var facility = await _context.Facilities.FindAsync(id);
+            if (facility == null)
                 return NotFound();
 
             me.FacilityId = id;
             me.TransportCompanyId = null;
             me.Role = Roles.Admin;
             me.UpdatedAt = DateTime.UtcNow;
+
+            LogAction(me, "impersonate_facility", "facility", id, facility.Name);
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -172,8 +277,12 @@ namespace TrustedTransit.Api.Controllers
                 return Forbid();
 
             var me = (await CurrentUserAsync(_context))!;
+            var exitedFacilityId = me.FacilityId;
             me.FacilityId = null;
             me.UpdatedAt = DateTime.UtcNow;
+
+            if (exitedFacilityId != null)
+                LogAction(me, "exit_impersonation", "facility", exitedFacilityId, "");
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -223,5 +332,16 @@ namespace TrustedTransit.Api.Controllers
     public class VetRequest
     {
         public string Status { get; set; } = "";
+    }
+
+    public class AuditLogDto
+    {
+        public Guid Id { get; set; }
+        public string ActorEmail { get; set; } = "";
+        public string Action { get; set; } = "";
+        public string TargetType { get; set; } = "";
+        public Guid? TargetId { get; set; }
+        public string Detail { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
     }
 }
