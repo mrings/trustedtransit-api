@@ -18,6 +18,7 @@ namespace TrustedTransit.Api.Data
         public DbSet<TransportCompany> TransportCompanies { get; set; }
         public DbSet<TransportCompanyDomain> TransportCompanyDomains { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<FacilityProvider> FacilityProviders { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -115,6 +116,29 @@ namespace TrustedTransit.Api.Data
 
             modelBuilder.Entity<AuditLog>()
                 .HasIndex(a => a.CreatedAt);
+
+            // A facility can add a given independent driver, or a given company, only once.
+            modelBuilder.Entity<FacilityProvider>()
+                .HasIndex(p => new { p.FacilityId, p.DriverId })
+                .IsUnique()
+                .HasFilter("\"DriverId\" IS NOT NULL");
+            modelBuilder.Entity<FacilityProvider>()
+                .HasIndex(p => new { p.FacilityId, p.TransportCompanyId })
+                .IsUnique()
+                .HasFilter("\"TransportCompanyId\" IS NOT NULL");
+
+            modelBuilder.Entity<FacilityProvider>()
+                .HasOne(p => p.Facility).WithMany()
+                .HasForeignKey(p => p.FacilityId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<FacilityProvider>()
+                .HasOne(p => p.Driver).WithMany()
+                .HasForeignKey(p => p.DriverId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<FacilityProvider>()
+                .HasOne(p => p.TransportCompany).WithMany()
+                .HasForeignKey(p => p.TransportCompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

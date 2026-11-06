@@ -126,38 +126,6 @@ namespace TrustedTransit.Api.Controllers
             HasLogin = d.UserId != null,
         };
 
-        // Admin only. Drivers aren't facility-scoped yet (shared provider pool).
-        [HttpPost]
-        public async Task<ActionResult<DriverDto>> CreateDriver([FromBody] CreateDriverRequest request)
-        {
-            if (await CheckAdminAsync(_context) is { } err) return err;
-
-            var driver = new Driver
-            {
-                FirstName = request.FirstName ?? string.Empty,
-                LastName = request.LastName ?? string.Empty,
-                Phone = request.Phone ?? string.Empty,
-                VehicleType = request.VehicleType ?? string.Empty,
-                VehiclePlate = request.VehiclePlate ?? string.Empty,
-                Email = NormalizeInviteEmail(request.Email),
-                BackgroundCheckStatus = "pending",
-                Rating = 0,
-                Status = "active"
-            };
-
-            _context.Drivers.Add(driver);
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Driver {DriverId} created", driver.Id);
-
-            return CreatedAtAction(nameof(GetDriver), new { id = driver.Id }, new DriverDto
-            {
-                Id = driver.Id,
-                FirstName = driver.FirstName,
-                LastName = driver.LastName
-            });
-        }
-
         // Admin only.
         [HttpPatch("{id}")]
         public async Task<IActionResult> UpdateDriver(Guid id, [FromBody] UpdateDriverRequest request)

@@ -130,6 +130,12 @@ namespace TrustedTransit.Api.Controllers
             if (facility == null)
                 return NotFound();
 
+            var addressChanged =
+                (request.Address != null && request.Address != facility.Address) ||
+                (request.City != null && request.City != facility.City) ||
+                (request.State != null && request.State != facility.State) ||
+                (request.Zip != null && request.Zip != facility.Zip);
+
             facility.Name = request.Name ?? facility.Name;
             facility.Address = request.Address ?? facility.Address;
             facility.City = request.City ?? facility.City;
@@ -138,6 +144,14 @@ namespace TrustedTransit.Api.Controllers
             facility.Phone = request.Phone ?? facility.Phone;
             facility.SubscriptionTier = request.SubscriptionTier ?? facility.SubscriptionTier;
             facility.UpdatedAt = DateTime.UtcNow;
+
+            // Stale cached geocode would silently mismatch the new address — clear it so the
+            // next nearby-provider search re-resolves it.
+            if (addressChanged)
+            {
+                facility.Lat = null;
+                facility.Lng = null;
+            }
 
             await _context.SaveChangesAsync();
             _logger.LogInformation("Facility {FacilityId} updated", id);

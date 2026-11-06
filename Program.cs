@@ -22,6 +22,7 @@ builder.Services.AddControllers(options =>
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<TrustedTransit.Api.Services.StripeBillingService>();
 builder.Services.AddSingleton<TrustedTransit.Api.Services.NotificationService>();
+builder.Services.AddSingleton<TrustedTransit.Api.Services.GeocodingService>();
 
 
 // Add Database

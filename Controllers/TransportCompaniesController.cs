@@ -109,6 +109,12 @@ namespace TrustedTransit.Api.Controllers
             if (company == null)
                 return NotFound();
 
+            var addressChanged =
+                (request.Address != null && request.Address != company.Address) ||
+                (request.City != null && request.City != company.City) ||
+                (request.State != null && request.State != company.State) ||
+                (request.Zip != null && request.Zip != company.Zip);
+
             company.Name = request.Name ?? company.Name;
             company.Address = request.Address ?? company.Address;
             company.City = request.City ?? company.City;
@@ -116,6 +122,14 @@ namespace TrustedTransit.Api.Controllers
             company.Zip = request.Zip ?? company.Zip;
             company.Phone = request.Phone ?? company.Phone;
             company.UpdatedAt = DateTime.UtcNow;
+
+            // Stale cached geocode would silently mismatch the new address — clear it so the
+            // next nearby-provider search re-resolves it.
+            if (addressChanged)
+            {
+                company.Lat = null;
+                company.Lng = null;
+            }
 
             await _context.SaveChangesAsync();
             _logger.LogInformation("Transport company {CompanyId} updated", id);

@@ -157,6 +157,12 @@ namespace TrustedTransit.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("Lat")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("Lng")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -236,6 +242,41 @@ namespace TrustedTransit.Api.Migrations
                     b.HasIndex("FacilityId");
 
                     b.ToTable("FacilityDomains");
+                });
+
+            modelBuilder.Entity("TrustedTransit.Api.Models.FacilityProvider", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DriverId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FacilityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TransportCompanyId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DriverId");
+
+                    b.HasIndex("TransportCompanyId");
+
+                    b.HasIndex("FacilityId", "DriverId")
+                        .IsUnique()
+                        .HasFilter("\"DriverId\" IS NOT NULL");
+
+                    b.HasIndex("FacilityId", "TransportCompanyId")
+                        .IsUnique()
+                        .HasFilter("\"TransportCompanyId\" IS NOT NULL");
+
+                    b.ToTable("FacilityProviders");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.Resident", b =>
@@ -517,6 +558,12 @@ namespace TrustedTransit.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("Lat")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("Lng")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -656,6 +703,31 @@ namespace TrustedTransit.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Facility");
+                });
+
+            modelBuilder.Entity("TrustedTransit.Api.Models.FacilityProvider", b =>
+                {
+                    b.HasOne("TrustedTransit.Api.Models.Driver", "Driver")
+                        .WithMany()
+                        .HasForeignKey("DriverId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("TrustedTransit.Api.Models.Facility", "Facility")
+                        .WithMany()
+                        .HasForeignKey("FacilityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TrustedTransit.Api.Models.TransportCompany", "TransportCompany")
+                        .WithMany()
+                        .HasForeignKey("TransportCompanyId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("Driver");
+
+                    b.Navigation("Facility");
+
+                    b.Navigation("TransportCompany");
                 });
 
             modelBuilder.Entity("TrustedTransit.Api.Models.Resident", b =>

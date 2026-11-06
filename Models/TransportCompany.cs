@@ -18,6 +18,12 @@ namespace TrustedTransit.Api.Models
         public string Zip { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
 
+        // Geocoded lazily from Address/City/State/Zip the first time a nearby-provider search
+        // runs (GeocodingService); null until then. Re-geocode by clearing both when the
+        // address changes.
+        public decimal? Lat { get; set; }
+        public decimal? Lng { get; set; }
+
         // pending | active | rejected. New companies start pending; a super admin vets them
         // (SupportController). Only "active" companies accept new drivers via domain auto-match
         // (BaseController.MatchTransportCompanyByEmailDomainAsync) — vetting gates onboarding,

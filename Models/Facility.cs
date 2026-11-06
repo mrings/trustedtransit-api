@@ -9,6 +9,13 @@ namespace TrustedTransit.Api.Models
         public string State { get; set; } = string.Empty;
         public string Zip { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
+
+        // Geocoded lazily from Address/City/State/Zip the first time a nearby-provider search
+        // runs (GeocodingService); null until then. Re-geocode by clearing both when the
+        // address changes.
+        public decimal? Lat { get; set; }
+        public decimal? Lng { get; set; }
+
         public string SubscriptionTier { get; set; } = "starter";       // Plans.All keys
         public string SubscriptionStatus { get; set; } = "trial";       // trial | active | canceled | past_due
         public DateTime? TrialEndsAt { get; set; }
